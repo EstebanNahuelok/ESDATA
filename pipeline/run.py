@@ -83,11 +83,24 @@ def correr(datos: Path, entrega: Path, base: Path, semilla: int = 0) -> dict:
 
     avisos = []
     n_cuentas = len(cuentas["seguidores"])
+    n_com = int(nar.comunidad.max()) + 1 if len(nar.comunidad) else 0
+    cuenta = com["cuenta"].astype(np.int64)
+
+    def etapa_bandos():
+        bando = calcular_bandos(nar)
+        return bando, postura_por_comentario(nar, bando, np.ones(n_com), padre)
+
+    try:
+        bando, bando_com = reloj.etapa("bandos", etapa_bandos)
+    except Exception:
+        traceback.print_exc()
+        avisos.append("falló el armado de bandos: se asignó 'apoya' a todo")
+        bando, bando_com = np.ones(len(nar.tipo)), (nar.narrativa >= 0).astype(float)
+
     try:
         grupo_cuenta, info_coord = reloj.etapa(
-            "coordinacion", detectar_coordinacion, n_cuentas=n_cuentas, cuenta=com["cuenta"].astype(np.int64),
-            pub=com["pub"].astype(np.int64), ts=ts, padre=padre, micro=nar.micro, narrativa=nar.narrativa,
-            me_gusta=com["me_gusta"], hora_local=com["hora_local"], creada_ts=cuentas["creada_ts"], semilla=semilla)
+            "coordinacion", detectar_coordinacion, n_cuentas=n_cuentas, cuenta=cuenta,
+            pub=com["pub"].astype(np.int64), ts=ts, narrativa=nar.narrativa, bando=bando_com)
     except Exception:  # la entrega sale igual, sin grupos
         traceback.print_exc()
         avisos.append("falló la etapa de coordinación: no se marcaron cuentas")
@@ -95,24 +108,22 @@ def correr(datos: Path, entrega: Path, base: Path, semilla: int = 0) -> dict:
     print(f"  {json.dumps(info_coord, ensure_ascii=False)}", flush=True)
 
     def etapa_postura():
-        bando = calcular_bandos(nar)
-        coordinado = (grupo_cuenta != "")[com["cuenta"].astype(np.int64)] if n_cuentas else None
+        coordinado = (grupo_cuenta != "")[cuenta] if n_cuentas else None
         signo, detalle = orientar(nar, bando, texto_id, padre, coordinado)
-        return bando, signo, postura_por_comentario(nar, bando, signo, padre), detalle
+        return signo, postura_por_comentario(nar, bando, signo, padre), detalle
 
     try:
-        bando, signo, postura, detalle_postura = reloj.etapa("postura", etapa_postura)
+        signo, postura, detalle_postura = reloj.etapa("postura", etapa_postura)
     except Exception:
         traceback.print_exc()
-        avisos.append("falló la etapa de postura: se asignó 'apoya' a todo")
-        k, n_com = len(nar.tipo), int(nar.comunidad.max()) + 1 if len(nar.comunidad) else 0
-        bando, signo, postura, detalle_postura = np.ones(k), np.ones(n_com), (nar.narrativa >= 0).astype(float), {}
+        avisos.append("falló la orientación de la postura: quedó el bando sin orientar")
+        signo, postura, detalle_postura = np.ones(n_com), bando_com, {}
 
     etiquetas, filas = reloj.etapa("origen_y_titulos", describir_narrativas, nar, bando, signo, textos, n_textos,
                                    ts, resumen["zona_seg"])
     for f in filas:
-        d = detalle_postura.get(int(f["narrativa"][1:]) - 1, {})
         print(f"  {f['narrativa']} {f['comentarios']:>6} {f['fecha_origen']}  {f['titulo'][:70]}", flush=True)
+    print(f"  indicios de postura por narrativa: {json.dumps(dict(zip(etiquetas.tolist(), (detalle_postura.get(c, {}) for c in range(n_com)))), ensure_ascii=False)}", flush=True)
     reloj.etapa("escritura", escribir_entrega, con, entrega, etiquetas, nar.narrativa, postura, filas, grupo_cuenta)
     con.close()
 
