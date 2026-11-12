@@ -21,6 +21,7 @@ from .coordinacion import detectar_coordinacion
 from .costo import armar_costo, memoria_mb
 from .ingesta import ingerir
 from .narrativas import detectar_narrativas
+from .parametros import de_etapa, interpretar, resolver
 from .postura import calcular_bandos, orientar, postura_por_comentario
 from .reporte import generar_reporte
 from .salida import describir_narrativas, escribir_costo, escribir_entrega
@@ -50,7 +51,10 @@ def _a_float(columna) -> np.ndarray:
     return np.asarray(columna, dtype=np.float64)
 
 
-def correr(datos: Path, entrega: Path, base: Path, semilla: int = 0, hardware: str = None, reporte: Path = None) -> dict:
+def correr(datos: Path, entrega: Path, base: Path, semilla: int = 0, hardware: str = None, reporte: Path = None,
+           parametros: dict = None) -> dict:
+    """`parametros` cambia valores de parametros.py solo para esta corrida (queda anotado en costo.json)."""
+    p = resolver(parametros)
     reloj = Reloj()
     np.random.seed(semilla)
     con, resumen = reloj.etapa("ingesta", ingerir, datos, base)
@@ -64,10 +68,15 @@ def correr(datos: Path, entrega: Path, base: Path, semilla: int = 0, hardware: s
     textos, n_textos = list(tx["texto"]), tx["n"].astype(np.int64)
     cuentas = con.execute("SELECT creada_ts, seguidores, siguiendo FROM cuentas ORDER BY cuenta").fetchnumpy()
 
-    nar = reloj.etapa("narrativas", detectar_narrativas, textos, n_textos, texto_id, padre, semilla=semilla)
+    nar = reloj.etapa("narrativas", detectar_narrativas, textos, n_textos, texto_id, padre, semilla=semilla,
+                      **de_etapa(p, "narrativas"))
     print(f"  {json.dumps(nar.info, ensure_ascii=False)}", flush=True)
 
     avisos = list(resumen["avisos"])
+    if not nar.info["usa_hilos"] and resumen["comentarios"]:
+        avisos.append("ALERTA: el set casi no trae respuestas (respuesta_a), así que no se pudo usar la conversación: "
+                      "narrativas, ruido y postura salen del plan B por palabras, que es mucho menos confiable")
+        print(f"  {avisos[-1]}", flush=True)
     n_cuentas = len(cuentas["seguidores"])
     n_com = int(nar.comunidad.max()) + 1 if len(nar.comunidad) else 0
     cuenta = com["cuenta"].astype(np.int64)
@@ -87,7 +96,7 @@ def correr(datos: Path, entrega: Path, base: Path, semilla: int = 0, hardware: s
         grupo_cuenta, info_coord = reloj.etapa(
             "coordinacion", detectar_coordinacion, n_cuentas=n_cuentas, cuenta=cuenta,
             pub=com["pub"].astype(np.int64), ts=ts, narrativa=nar.narrativa, bando=bando_com,
-            creada_ts=_a_float(cuentas["creada_ts"]), usar_mensaje=nar.info["usa_hilos"])
+            creada_ts=_a_float(cuentas["creada_ts"]), usar_mensaje=nar.info["usa_hilos"], **de_etapa(p, "coordinacion"))
     except Exception:  # la entrega sale igual, sin grupos
         traceback.print_exc()
         avisos.append("falló la etapa de coordinación: no se marcaron cuentas")
@@ -96,7 +105,7 @@ def correr(datos: Path, entrega: Path, base: Path, semilla: int = 0, hardware: s
 
     def etapa_postura():
         coordinado = (grupo_cuenta != "")[cuenta] if n_cuentas else None
-        signo, detalle = orientar(nar, bando, texto_id, padre, coordinado)
+        signo, detalle = orientar(nar, bando, texto_id, padre, coordinado, **de_etapa(p, "postura"))
         return signo, postura_por_comentario(nar, bando, signo, padre), detalle
 
     try:
@@ -107,7 +116,7 @@ def correr(datos: Path, entrega: Path, base: Path, semilla: int = 0, hardware: s
         signo, postura, detalle_postura = np.ones(n_com), bando_com, {}
 
     etiquetas, filas = reloj.etapa("origen_y_titulos", describir_narrativas, nar, bando, signo, textos, n_textos,
-                                   ts, resumen["zona_seg"])
+                                   ts, resumen["zona_seg"], **de_etapa(p, "origen"))
     for f in filas:
         print(f"  {f['narrativa']} {f['comentarios']:>6} {f['fecha_origen']}  {f['titulo'][:70]}", flush=True)
     sin_fecha = sum(f["sin_fecha"] for f in filas)
@@ -123,6 +132,7 @@ def correr(datos: Path, entrega: Path, base: Path, semilla: int = 0, hardware: s
     def guardar_costo():
         costo = armar_costo(resumen["comentarios"], time.perf_counter() - reloj.inicio, reloj.etapas, resumen["archivos"],
                             base, entrega, avisos, semilla, hardware)
+        costo["parametros_cambiados"] = dict(parametros or {})
         escribir_costo(entrega, costo)
         return costo
 
@@ -154,6 +164,8 @@ def main(argv=None):
     ap.add_argument("--reporte", type=Path, default=None,
                     help="Archivo HTML del reporte visual (por defecto reporte/<nombre de --entrega>.html)")
     ap.add_argument("--sin-reporte", action="store_true", help="No generar el reporte visual")
+    ap.add_argument("--param", action="append", default=[], metavar="NOMBRE=VALOR",
+                    help="Cambia un parámetro de pipeline/parametros.py solo para esta corrida (se puede repetir)")
     args = ap.parse_args(argv)
     base = args.base or Path("almacen") / f"{args.datos.resolve().name}.duckdb"
     for flujo in (sys.stdout, sys.stderr):
@@ -161,8 +173,8 @@ def main(argv=None):
             flujo.reconfigure(encoding="utf-8", errors="replace")
     try:
         reporte = None if args.sin_reporte else args.reporte or Path("reporte") / f"{args.entrega.resolve().name}.html"
-        correr(args.datos, args.entrega, base, args.semilla, args.hardware, reporte)
-    except FileNotFoundError as e:
+        correr(args.datos, args.entrega, base, args.semilla, args.hardware, reporte, dict(interpretar(x) for x in args.param))
+    except (FileNotFoundError, ValueError) as e:
         sys.exit(f"ERROR: {e}")
     except EntregaInvalida as e:
         sys.exit(f"ERROR: {e}")

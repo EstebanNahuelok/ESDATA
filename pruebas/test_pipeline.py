@@ -11,7 +11,8 @@ import unittest
 from pathlib import Path
 
 from pipeline.run import correr
-from pipeline.validar import validar_entrega
+from pipeline.parametros import interpretar, resolver
+from pipeline.validar import controles_de_cordura, validar_entrega
 from pipeline.texto import corregir_tipeo, normalizar
 
 RAIZ = Path(__file__).resolve().parent.parent
@@ -136,6 +137,32 @@ class DatosChicosTest(Base):
     def test_falta_el_archivo_de_comentarios(self):
         with self.assertRaises(FileNotFoundError):
             self.correr()
+
+
+class ParametrosTest(Base):
+    def test_resolver_e_interpretar(self):
+        self.assertEqual(resolver()["lift_min"], 40.0)
+        self.assertEqual(resolver({"k_truss": "5"})["k_truss"], 5)
+        self.assertEqual(interpretar("ventana_s=900"), ("ventana_s", 900))
+        for malo in ("inventado=3", "lift_min", "bloque=10"):   # desconocido, sin valor, no ajustable
+            with self.assertRaises(ValueError):
+                interpretar(malo)
+        with self.assertRaises(ValueError):
+            resolver({"inventado": 1})
+
+    def test_un_parametro_cambiado_queda_anotado(self):
+        filas = [[f"c{i}", "p1", f"u{i % 9}", "2026-09-01T10:00:00-03:00", "La obra está parada hace más de un año", "", "0"] for i in range(30)]
+        escribir(self.datos / "comentarios.csv", COLUMNAS, filas)
+        costo = correr(self.datos, self.entrega, self.tmp / "p.duckdb", parametros={"min_grupo": 8, "lift_min": 60})
+        self.assertEqual(costo["parametros_cambiados"], {"min_grupo": 8, "lift_min": 60})
+
+    def test_controles_de_cordura(self):
+        normal = dict(comentarios=200000, comentarios_con_narrativa=162000, tam_narrativas=[18000] * 9, cuentas=16000,
+                      cuentas_coordinadas=115, tam_grupos=[60, 30, 25])
+        self.assertEqual(controles_de_cordura(normal)[1], [])
+        raro = dict(comentarios=1000, comentarios_con_narrativa=990, tam_narrativas=[900, 50, 40], cuentas=500,
+                    cuentas_coordinadas=60, tam_grupos=[60])
+        self.assertEqual(len(controles_de_cordura(raro)[1]), 3)   # narrativa gigante, casi sin ruido, demasiadas cuentas
 
 
 class ValidadorTest(Base):

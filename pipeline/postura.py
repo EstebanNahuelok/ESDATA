@@ -71,7 +71,9 @@ def _entropia_efectiva(conteos: np.ndarray) -> float:
 
 
 def orientar(nar: Narrativas, bando: np.ndarray, texto_id: np.ndarray, padre: np.ndarray,
-             coordinado: np.ndarray = None) -> tuple:
+             coordinado: np.ndarray = None, peso_marcas: float = 20.0, peso_campana: float = 20.0,
+             peso_sueltos: float = 0.5, tope_sueltos: float = 3.0, peso_variedad: float = 1.0,
+             peso_volumen: float = 1.0) -> tuple:
     """Decide qué bando apoya en cada narrativa. Devuelve (signo por comunidad, detalle por comunidad)."""
     n_com = int(nar.comunidad.max()) + 1 if len(nar.comunidad) else 0
     signo = np.ones(n_com)
@@ -99,10 +101,10 @@ def orientar(nar: Narrativas, bando: np.ndarray, texto_id: np.ndarray, padre: np
         pa, pb = a["sueltos"] / a["n"], b["sueltos"] / b["n"]
         p = (a["sueltos"] + b["sueltos"]) / (a["n"] + b["n"])
         ee = np.sqrt(max(p * (1 - p) * (1 / a["n"] + 1 / b["n"]), 1e-12))
-        partes = {"marcas": 20 * (b["marca"] - a["marca"]), "campana": 20 * (a["coord"] - b["coord"]),
-                  "sueltos": 0.5 * float(np.clip((pa - pb) / ee, -3, 3)),
-                  "variedad": float(np.log(a["variedad"] / b["variedad"])),
-                  "volumen": float(np.log(a["n"] / b["n"]))}
+        partes = {"marcas": peso_marcas * (b["marca"] - a["marca"]), "campana": peso_campana * (a["coord"] - b["coord"]),
+                  "sueltos": peso_sueltos * float(np.clip((pa - pb) / ee, -tope_sueltos, tope_sueltos)),
+                  "variedad": peso_variedad * float(np.log(a["variedad"] / b["variedad"])),
+                  "volumen": peso_volumen * float(np.log(a["n"] / b["n"]))}
         puntaje = sum(partes.values())
         signo[c] = 1.0 if puntaje >= 0 else -1.0
         detalle[c] = {"puntaje": round(puntaje, 3), **{k: round(v, 3) for k, v in partes.items()}}

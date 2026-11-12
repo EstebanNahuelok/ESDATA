@@ -101,8 +101,14 @@ Trae las 8 claves del enunciado y algunas más.
 Opciones: `--base ruta.duckdb` (dónde guardar la base; por defecto `almacen/<nombre de la carpeta de datos>.duckdb`)
 `--semilla N` (por defecto 0) y `--hardware "texto"` (para escribir a mano la descripción del equipo en
 `costo.json` en vez de la detectada). Con la misma semilla, dos corridas dan archivos idénticos byte a byte.
+`--param nombre=valor` cambia un parámetro de `pipeline/parametros.py` solo en esa corrida y lo deja anotado en
+`costo.json`.
 
-Pruebas automáticas (20 pruebas, 35 segundos):
+Después de validar, el pipeline imprime unos **controles de cordura** (cuántas narrativas, qué porcentaje de ruido,
+cuántas cuentas marcadas y de qué tamaño es cada grupo) y avisa si algo es absurdo: una sola narrativa gigante,
+cientos de narrativas, casi todo ruido, miles de cuentas marcadas o un set sin respuestas.
+
+Pruebas automáticas (23 pruebas, unos 45 segundos):
 
 ```bash
 python -m unittest discover -s pruebas
@@ -186,6 +192,10 @@ con ayuda de un asistente de programación con IA. El pipeline en sí no usa IA 
 
 ## Qué ajustamos mirando el set de práctica y qué es regla general
 
+Todos los parámetros y umbrales están en un solo archivo, [`pipeline/parametros.py`](pipeline/parametros.py), cada uno
+con qué hace y de dónde salió su valor (`python -m pipeline.parametros` imprime la tabla completa: 45 parámetros).
+Abajo va el resumen.
+
 El set final trae otros temas y otras campañas, así que separamos lo que es una regla del problema de lo que
 es un número que elegimos midiendo en práctica. **No hay ids, temas, nombres de narrativas ni fechas del set
 de práctica en el código.**
@@ -218,25 +228,33 @@ de práctica en el código.**
 | Parecido mínimo para ser la misma frase (`umbral_micro`) | 0,5 | Pureza de los microgrupos contra la verdad. | Baja: con 0,5 la pureza es 99,99%. |
 | Tamaño mínimo de un microgrupo y parecido para absorber variantes raras | 30 comentarios / 0,25 | Pureza de las absorciones (100% por encima de 0,25). | Baja. |
 | Fracción de respuestas para tratar una frase como "acuerdo" | 0,9 | Mirando las frases tipo "tal cual". | Baja: las frases son casi todo respuesta o casi nada. |
-| Ventana de coincidencia | 30 minutos | Comparamos 15 y 30 minutos. | Media: depende del ritmo de las campañas. |
-| Lift mínimo de un par | 40 | Hay una meseta: entre 20 y 100 el resultado no cambia. | Baja dentro de la meseta. |
-| Repeticiones mínimas de un par | 2 (misma narrativa y bando) / 3 (solo tiempo) | Precisión contra la verdad. | Media. |
-| Densidad de la malla (k-truss) y tamaño mínimo de grupo | 4 / 5 cuentas | Precisión contra la verdad. | Media: con 3 aparecen falsos positivos. |
+| Ventana de coincidencia | 30 minutos | Comparamos 15 y 30 minutos. | Baja: entre 15 y 45 minutos cambia menos de 0,15 puntos. |
+| Lift mínimo de un par | 40 | Hay una meseta entre 30 y 60. | Baja dentro de la meseta; con 20 aparecen 7 falsos positivos. |
+| Repeticiones mínimas de un par | 2 (misma narrativa y bando) / 3 (solo tiempo) | Precisión contra la verdad. | **Alta hacia abajo**: con un paso menos se marcan cientos o miles de cuentas genuinas. Hacia arriba casi no cuesta. |
+| Densidad de la malla (k-truss) y tamaño mínimo de grupo | 4 / 5 cuentas | Precisión contra la verdad. | **Alta hacia abajo** en k-truss: con 3 aparecen 22 falsos positivos. Con 5 o 6 no cambia nada. El tamaño mínimo no influye. |
 | Ampliación de grupos: celdas "dominadas" | 3+ miembros y 1/3 de la celda; franja de creación rara si cubre < 2% de las cuentas | Probado en recortes del set. | Baja. |
-| Pesos de los indicios de postura | 20 / 20 / 0,5 / 1 / 1 | A mano, mirando práctica. Es la parte menos sólida. | Alta: es donde más esperamos fallar. |
+| Pesos de los indicios de postura | 20 / 20 / 0,5 / 1 / 1 | A mano, mirando práctica. Es la parte menos sólida. | Nula: moverlos ±50% no cambia nada. Las narrativas que quedan al revés no se arreglan con pesos. |
 | Lista de marcas de desmentida | 21 expresiones | Línea base + las que vimos en práctica. | Media: otras campañas pueden desmentir con otras palabras. |
 | Origen: compañía mínima | 5 comentarios en 12 horas | Valor razonable; no se ajustó. | Baja. |
 | Plan B sin respuestas: parecido entre microgrupos | 0,1 | El mejor de los que probamos (y aun así flojo). | — |
 
-Para no engañarnos con un puntaje casi perfecto, medimos el pipeline sobre recortes del set que no usamos para
-elegir nada (por días, por tema, con la mitad de las cuentas, con datos sucios, sin respuestas). La tabla
-completa está en [`PROGRESO.md`](PROGRESO.md).
+Para no engañarnos con un puntaje casi perfecto hicimos tres cosas, todas reproducibles con los scripts de
+`verificacion/` y con los resultados completos en [`PROGRESO.md`](PROGRESO.md):
+
+- **Sensibilidad:** movimos cada parámetro -50% y +50%. De 29, 23 no cambian el puntaje. Los frágiles son cuatro
+  umbrales enteros de coordinación: están en el valor mínimo que da precisión perfecta en práctica, y un paso más
+  flojo trae falsos positivos. No tenemos margen de ese lado.
+- **Generalización:** corrimos el pipeline sobre recortes que no usamos para elegir nada (cada mitad de los días,
+  sin respuestas, con la mitad de las respuestas borradas, muestras de 20.000 comentarios, datos sucios).
+- **Ejemplos al azar** de comentarios y de cuentas marcadas, con el porqué de cada cuenta.
 
 ## Limitaciones conocidas
 
 - **Postura:** los dos bandos de cada narrativa salen bien separados, pero decidir cuál "apoya" falla cuando no hay marcas de desmentida ni campaña. En práctica queda al revés 1 de 13 narrativas. Es un problema de significado; una sola llamada a un modelo de lenguaje con las frases representativas lo resolvería, y decidimos no usar IA por ahora.
 - **Dependencia de los hilos de respuestas:** ver la tabla de supuestos.
 - **Campañas de otro estilo** (coordinadas entre publicaciones distintas, o con horas de diferencia) podrían no verse con la ventana de 30 minutos.
+- **Un falso positivo conocido en coordinación:** en una muestra chica dominada por una publicación viral, el pipeline marcó como grupo a 5 cuentas genuinas que coincidieron dos veces dentro de esa misma publicación. En el set completo no pasa. Hay un parámetro que lo evita (`min_pubs_compartidas=2`, pedir que un par comparta al menos dos publicaciones), apagado por defecto.
+- **La fecha de origen se degrada con pocos datos o con el agrupamiento sucio:** es el primer comentario con compañía, así que un comentario mal asignado puede correrla varios días.
 - **No medimos una corrida con millones de comentarios.**
 
 ## Estructura del repo
@@ -244,6 +262,7 @@ completa está en [`PROGRESO.md`](PROGRESO.md).
 ```
 pipeline/        nuestro código (un módulo por etapa; entrada: python -m pipeline.run)
 pruebas/         pruebas mínimas (formato, datos sucios, reproducibilidad)
+verificacion/    sensibilidad, generalización y ejemplos (usan la verdad de práctica; no son parte del pipeline)
 entrega/         resultado del set final (se genera el viernes 13)
 reporte/         reporte visual en HTML de cada corrida
 evaluacion/      evaluador oficial (de la organización)

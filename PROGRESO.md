@@ -209,3 +209,459 @@ Archivos nuevos hoy: `README.md` (equipo), `DESAFIO.md` (enunciado, renombrado),
 4. Leer la salida: tiene que terminar con "Validación de entrega: OK". Mirar cuántas narrativas y grupos salieron y abrir `reporte/entrega.html`: si algo se ve raro (una sola narrativa gigante, cientos de narrativas, cero grupos), avisar antes de entregar.
 5. `git add entrega reporte` + commit, unir a `main`, push.
 6. Completar los **[VIERNES]** de `PITCH.md` y cargar en Hacki con el link y el video.
+
+---
+
+# Verificación del jueves 12 a la tarde: ¿funciona, o solo da buen puntaje en práctica?
+
+Cerrado a las 15:12. Todo lo de esta sección se puede volver a generar con los scripts de `verificacion/`
+(nuevos, versionados; escriben en `salida/verificacion/`, que no se versiona):
+
+```bash
+python -m pipeline.parametros                     # tabla de parámetros
+python verificacion/sensibilidad.py               # punto 2 (unos 20 minutos)
+python verificacion/generalizacion.py             # puntos 4 y 7 (unos 6 minutos)
+python verificacion/ejemplos.py                   # punto 5
+python verificacion/informe.py                    # junta todas las tablas
+```
+
+## Resumen en diez renglones
+
+1. **Narrativas y ruido son sólidos.** Aguantan mover cualquier parámetro ±50%, medio set, la mitad de los hilos rotos y una muestra de 20.000 comentarios (agrupamiento ≥ 0,96 en todos los casos con respuestas).
+2. **La coordinación está parada al borde de un escalón.** Cuatro umbrales enteros (`veces_con_texto`, `veces_sin_texto`, `k_truss`, `ampliar_min_celdas`) se desploman si se aflojan **un solo paso**: de 115 cuentas marcadas se pasa a 137, 202, 283 o 14.437. Endurecerlos un paso casi no cuesta nada. Detalle en el punto 2.
+3. **Encontré un falso positivo real**: en una muestra chica dominada por una publicación viral, el pipeline marcó como grupo coordinado a 5 cuentas genuinas. Hay un arreglo de una línea (`min_pubs_compartidas=2`) que lo elimina sin cambiar ningún otro resultado. **No lo activé: es decisión de ustedes** (punto 7).
+4. **La postura no mejora tocando pesos**: mover cualquiera de los cinco pesos ±50% no cambia nada, ni en el set completo ni en la segunda mitad. Las narrativas que quedan al revés quedan al revés con cualquier peso razonable. Sigue siendo lo más flojo (0,81 a 0,93 según el recorte).
+5. **Sin `respuesta_a` el pipeline no sirve para narrativas** (35,6 de 55). Ahora lo avisa con una alerta explícita.
+6. **La fecha de origen es frágil cuando el agrupamiento se ensucia o hay pocos datos**: perfecta con el set completo, pero cae a 0,67 con la mitad de los enlaces rotos y a 0,49 en una de las muestras chicas.
+7. **Controles de cordura** en práctica: 13 narrativas, 18,9% de ruido, 115 cuentas en grupos de 60, 30 y 25. Ninguno absurdo. Ahora el pipeline los imprime al final de cada corrida, con alertas si algo se sale de rango.
+8. **Reproducible**: cuatro corridas seguidas, archivos idénticos byte a byte (y también idénticos a los de antes de los cambios de hoy).
+9. **El tiempo depende mucho de la memoria libre de la notebook**: 27 s ayer, 49-51 s hoy con la máquina normal, y **149-177 s** con menos de 0,5 GB de RAM libre. Para el viernes: cerrar Discord, Brave y lo que no haga falta.
+10. **Con 20.000 comentarios se puede probar rápido (7-10 s) narrativas, ruido y bandos. Coordinación y origen necesitan el set completo.**
+
+## Qué cambió en el código durante la verificación
+
+Pediste verificar, no cambiar, así que lo que toqué no altera el resultado: la salida de práctica es **idéntica byte a byte** a la de antes (54,56 / 55) y las pruebas pasan (ahora son 23).
+
+- `pipeline/parametros.py` (nuevo): todos los parámetros en un solo lugar, con qué hace cada uno y de dónde salió. Antes estaban repartidos como valores por defecto en seis archivos, y varios estaban escritos como números sueltos dentro del código.
+- `--param nombre=valor` en `python -m pipeline.run`: cambia un parámetro solo en esa corrida y lo deja anotado en `costo.json` (`parametros_cambiados`). Sirve para la sensibilidad y para una emergencia el viernes.
+- **Controles de cordura** al final de cada corrida (en `pipeline/validar.py`): cantidad de narrativas, % de ruido, cuentas marcadas y tamaño de cada grupo, con alertas si hay menos de 2 o más de 60 narrativas, una narrativa con más de la mitad de los comentarios, ruido fuera de 2%-60%, más del 5% de las cuentas marcadas, un grupo gigante o ningún grupo. No cortan la corrida.
+- **Alerta nueva** cuando el set casi no trae respuestas y se usa el plan B.
+- `min_pubs_compartidas` (parámetro nuevo de coordinación): **apagado por defecto** (vale 1, no filtra nada). Ver punto 7.
+- `verificacion/` (nuevo): cinco scripts. No son parte del pipeline y usan la verdad de práctica.
+
+## 1. Todos los parámetros y umbrales
+
+45 parámetros: 19 «ajustado en práctica», 16 «criterio, sin ajustar», 7 «técnico», 3 «regla general».
+
+| Parámetro | Valor | Etapa | Qué hace | De dónde sale |
+|---|---|---|---|---|
+| `tipeo_min_largo` | 4 | narrativas | Largo mínimo de una palabra para corregirle errores de tipeo (protege palabras cortas como 'la'/'al'). | criterio, sin ajustar |
+| `tipeo_razon` | 10 | narrativas | Una palabra rara se corrige solo si la candidata es al menos esta cantidad de veces más frecuente. | criterio, sin ajustar |
+| `tfidf` | palabras y pares, min_df=2, tf sublineal | narrativas | Cómo se representa cada texto para comparar frases (TF-IDF). Con muy pocos textos baja a min_df=1. | criterio, sin ajustar |
+| `umbral_micro` | 0.5 | narrativas | Parecido mínimo (coseno) entre dos textos para considerarlos la misma frase (microgrupo). | ajustado en práctica |
+| `min_peso` | 30 | narrativas | Comentarios mínimos de un microgrupo; los más chicos se disuelven y pasan al grupo grande más parecido. También es lo mínimo para que la prueba de ruido sea concluyente. | ajustado en práctica |
+| `umbral_parecido` | 0.25 | narrativas | Parecido mínimo para absorber una variante rara en un microgrupo grande, y para sumar a una narrativa un microgrupo que quedó sin enlaces de respuesta. | ajustado en práctica |
+| `lote` | 2000 | narrativas | Textos que se comparan por tanda al armar microgrupos. | técnico |
+| `frac_acuerdo` | 0.9 | narrativas | Si esta fracción (o más) de las apariciones de una frase son respuestas, es una frase de acuerdo ('tal cual'): hereda narrativa y postura del comentario al que responde. | ajustado en práctica |
+| `alfa_ruido` | 0.01 | narrativas | Nivel de la prueba de ruido: una frase suelta es ruido si, a la tasa de respuestas del propio set, la probabilidad de que nadie le haya respondido nunca es menor a este valor. | regla general |
+| `factor_sin_eco` | 0.2 | narrativas | Una frase 'no tiene eco' si recibió menos de esta fracción de las respuestas esperadas. | criterio, sin ajustar |
+| `resolucion` | 1 | narrativas | Resolución de Louvain al partir el grafo de frases en narrativas (1 es el valor estándar). | regla general |
+| `min_respuestas` | 50 | narrativas | Con menos respuestas que esto en todo el set no se usan los hilos y se pasa al plan B por palabras. | criterio, sin ajustar |
+| `umbral_sin_hilos` | 0.1 | narrativas | Plan B (sin hilos): parecido mínimo entre microgrupos para unirlos en una narrativa. | ajustado en práctica |
+| `largo_ruido_sin_hilos` | 5 | narrativas | Plan B (sin hilos): una frase con menos palabras que esto, en promedio, es ruido. | ajustado en práctica |
+| `max_pasos_hilo` | 64 | narrativas | Profundidad máxima de un hilo de respuestas. | técnico |
+| `marcas_rechazo` | 21 expresiones ('mentira', 'falso', 'nada que ver'...) | postura | Marcas de desmentida: el bando que las usa es el que rechaza. Lista del idioma, completada mirando práctica. | ajustado en práctica |
+| `peso_marcas` | 20 | postura | Peso del indicio 'un bando usa más marcas de desmentida'. | ajustado en práctica |
+| `peso_campana` | 20 | postura | Peso del indicio 'un grupo coordinado empuja este bando'. | ajustado en práctica |
+| `peso_sueltos` | 0.5 | postura | Peso del indicio 'este bando aparece más como comentario suelto que como respuesta'. | ajustado en práctica |
+| `tope_sueltos` | 3 | postura | Tope (en desvíos estándar) del indicio de comentarios sueltos. | criterio, sin ajustar |
+| `peso_variedad` | 1 | postura | Peso del indicio 'este bando tiene más redacciones distintas'. | ajustado en práctica |
+| `peso_volumen` | 1 | postura | Peso del indicio 'este bando tiene más comentarios'. | ajustado en práctica |
+| `origen_min_comentarios` | 5 | origen | El origen es el primer comentario de la narrativa que tiene al menos esta compañía... | criterio, sin ajustar |
+| `origen_ventana_h` | 12 | origen | ...dentro de esta cantidad de horas (descarta apariciones aisladas). | criterio, sin ajustar |
+| `ventana_s` | 1800 | coordinacion | Ventana de coincidencia: dos cuentas coinciden si comentan la misma publicación dentro de estos segundos (se calcula dos veces, corrida media ventana). | ajustado en práctica |
+| `lift_min` | 40 | coordinacion | Cuántas veces más que lo esperable por azar tienen que coincidir dos cuentas para ser un par fuerte. | ajustado en práctica |
+| `veces_con_texto` | 2 | coordinacion | Coincidencias mínimas de un par cuando además empujan la misma narrativa y el mismo bando. | ajustado en práctica |
+| `veces_sin_texto` | 3 | coordinacion | Coincidencias mínimas de un par cuando solo se mira publicación y tiempo. | ajustado en práctica |
+| `min_pubs_compartidas` | 1 | coordinacion | Publicaciones distintas que tiene que compartir un par fuerte. Con 1 no filtra nada (valor actual); con 2 descarta pares que solo coinciden dentro de una misma publicación viral. | criterio, sin ajustar |
+| `k_truss` | 4 | coordinacion | Densidad de la malla: cada par fuerte tiene que compartir al menos k-2 cuentas en común con otros pares fuertes. | ajustado en práctica |
+| `min_grupo` | 5 | coordinacion | Cuentas mínimas para que una malla cuente como operación. | criterio, sin ajustar |
+| `ampliar_min_celdas` | 2 | coordinacion | Segunda pasada: una cuenta entra a un grupo si aparece en al menos estas celdas dominadas por el grupo. | criterio, sin ajustar |
+| `ampliar_min_miembros` | 3 | coordinacion | Segunda pasada: una celda está dominada por un grupo si tiene al menos estos miembros... | criterio, sin ajustar |
+| `ampliar_min_fraccion` | 0.333 | coordinacion | ...y además son al menos esta fracción de la celda. | ajustado en práctica |
+| `ampliar_rondas` | 3 | coordinacion | Cuántas veces se repite la segunda pasada. | criterio, sin ajustar |
+| `camada_max_rareza` | 0.02 | coordinacion | La franja de fechas de creación de un grupo cuenta como indicio solo si menos de esta fracción de todas las cuentas del set fue creada en esa franja. Con ese indicio alcanza una sola celda dominada. | ajustado en práctica |
+| `camada_min_validos` | 5 | coordinacion | Cuentas con fecha de creación válida que necesita un grupo para calcular su franja. | criterio, sin ajustar |
+| `camada_franja` | percentiles 10 a 90 del grupo, con un margen igual a su ancho (mínimo 1 día) | coordinacion | Cómo se arma la franja de fechas de creación de un grupo. | criterio, sin ajustar |
+| `max_aristas` | 200000 | coordinacion | Resguardo: si hubiera más pares fuertes que esto, se conservan solo los de mayor lift. | técnico |
+| `bloque` | 4000 | coordinacion | Cuentas por bloque al cruzar pares (acota la memoria). | técnico |
+| `memoria_duckdb` | 2GB | ingesta | Límite de memoria de DuckDB; si hace falta más, usa disco. | técnico |
+| `hilos_duckdb` | 4 | ingesta | Hilos de CPU que usa DuckDB. | técnico |
+| `zona_por_defecto` | -03:00 | ingesta | Zona horaria si ninguna fecha del set trae zona (si la traen, se usa la más frecuente). | regla general |
+| `frases_clave` | 6 | salida | Cantidad de términos en frases_clave de cada narrativa. | criterio, sin ajustar |
+| `semilla` | 0 | todas | Semilla de azar (solo la usa Louvain). Se cambia con --semilla. | técnico |
+
+Cómo leer la última columna:
+
+- **regla general**: sale del enunciado, del idioma o de la estadística.
+- **criterio, sin ajustar**: un valor razonable que puse a ojo y nunca comparé contra la verdad.
+- **ajustado en práctica**: lo elegí midiendo contra la verdad del set de práctica. Son los que pueden no servir igual en el set final.
+- **técnico**: solo cambia memoria o velocidad.
+
+Dos aclaraciones honestas sobre "ajustado en práctica":
+
+- En varios casos el "ajuste" fue probar un solo valor, ver que daba bien y quedarme con ese (`umbral_micro` 0,5; `frac_acuerdo` 0,9). No hubo una búsqueda fina, así que el riesgo de sobreajuste por esos es bajo, pero tampoco sé si son óptimos.
+- Los de coordinación sí salieron de comparar alternativas contra la verdad (ventana de 15 o 30 minutos, repeticiones 2 o 3, k-truss 3, 4 o 5, lift entre 5 y 100). Ahí está el riesgo real, y es justo donde la sensibilidad muestra escalones.
+
+Además de los parámetros, hay **tres supuestos** que no son números y que el set final podría no cumplir: al ruido nadie le responde, las respuestas con texto propio contradicen, y las campañas repiten. Están en el README.
+
+## 2. Sensibilidad: cada parámetro a -50% y a +50%
+
+Set de práctica completo, evaluador oficial. Los enteros se redondean al entero más cercano. "Estable": cambia menos de 0,25 puntos. "Sensible": menos de 1,5. "FRÁGIL": 1,5 o más.
+
+Base: total 54,56 · agrup. 1,000 · ruido 1,000 · postura 0,927 · origen 1,000 · coord. F1 1,000 · grupos 1,000
+
+| Parámetro | Valor | x0.5: valor → total (Δ) | x1.5: valor → total (Δ) | Qué se movió | Veredicto |
+|---|---|---|---|---|---|
+| `tipeo_min_largo` (narrativas) | 4 | 2 → 54,56 (+0,00) | 6 → 54,41 (-0,15) | origen 0,973 (x1.5) | estable |
+| `tipeo_razon` (narrativas) | 10 | 5 → 54,56 (+0,00) | 15 → 54,56 (+0,00) | — | estable |
+| `umbral_micro` (narrativas) | 0,5 | 0,25 → 53,03 (-1,53) | 0,75 → 54,40 (-0,16) | ruido 0,993 (x0.5); origen 0,667 (x0.5); grupos 0,991 (x1.5); 114 cuentas marcadas (x1.5) | **FRÁGIL** |
+| `min_peso` (narrativas) | 30 | 15 → 54,55 (-0,01) | 45 → 54,56 (+0,00) | — | estable |
+| `umbral_parecido` (narrativas) | 0,25 | 0,125 → 54,56 (+0,00) | 0,375 → 54,56 (+0,00) | — | estable |
+| `frac_acuerdo` (narrativas) | 0,9 | 0,45 → 54,56 (+0,00) | 1 → 54,56 (+0,00) | — | estable |
+| `alfa_ruido` (narrativas) | 0,01 | 0,005 → 54,56 (+0,00) | 0,015 → 54,56 (+0,00) | — | estable |
+| `factor_sin_eco` (narrativas) | 0,2 | 0,1 → 54,56 (+0,00) | 0,3 → 54,56 (+0,00) | — | estable |
+| `resolucion` (narrativas) | 1 | 0,5 → 54,56 (+0,00) | 1,5 → 54,56 (+0,00) | — | estable |
+| `min_respuestas` (narrativas) | 50 | 25 → 54,56 (+0,00) | 75 → 54,56 (+0,00) | — | estable |
+| `ventana_s` (coordinacion) | 1800 | 900 → 54,42 (-0,14) | 2700 → 54,41 (-0,15) | grupos 0,992 (x0.5); 114 cuentas marcadas (x0.5); coord. F1 0,991 (x1.5); 117 cuentas marcadas (x1.5) | estable |
+| `lift_min` (coordinacion) | 40 | 20 → 54,04 (-0,52) | 60 → 54,56 (+0,00) | coord. F1 0,970 (x0.5); 122 cuentas marcadas (x0.5) | sensible |
+| `veces_con_texto` (coordinacion) | 2 | 1 → 34,06 (-20,50) | 3 → 54,56 (+0,00) | coord. F1 0,016 (x0.5); grupos 0,564 (x0.5); 14437 cuentas marcadas (x0.5) | **FRÁGIL** |
+| `veces_sin_texto` (coordinacion) | 3 | 2 → 47,17 (-7,39) | 5 → 54,56 (+0,00) | coord. F1 0,578 (x0.5); 283 cuentas marcadas (x0.5) | **FRÁGIL** |
+| `min_pubs_compartidas` (coordinacion) | 1 | 1 → 54,56 (+0,00) | 2 → 54,56 (+0,00) | — | estable |
+| `k_truss` (coordinacion) | 4 | 2 → 35,97 (-18,59) | 6 → 54,56 (+0,00) | coord. F1 0,028 (x0.5); grupos 0,789 (x0.5); 8107 cuentas marcadas (x0.5) | **FRÁGIL** |
+| `min_grupo` (coordinacion) | 5 | 3 → 54,56 (+0,00) | 8 → 54,56 (+0,00) | — | estable |
+| `ampliar_min_celdas` (coordinacion) | 2 | 1 → 49,76 (-4,80) | 3 → 54,42 (-0,14) | coord. F1 0,726 (x0.5); 202 cuentas marcadas (x0.5); grupos 0,992 (x1.5); 114 cuentas marcadas (x1.5) | **FRÁGIL** |
+| `ampliar_min_miembros` (coordinacion) | 3 | 2 → 54,56 (+0,00) | 5 → 54,42 (-0,14) | grupos 0,992 (x1.5); 114 cuentas marcadas (x1.5) | estable |
+| `ampliar_min_fraccion` (coordinacion) | 0,333 | 0,167 → 54,56 (+0,00) | 0,5 → 54,56 (+0,00) | — | estable |
+| `camada_max_rareza` (coordinacion) | 0,02 | 0,01 → 54,56 (+0,00) | 0,03 → 54,56 (+0,00) | — | estable |
+| `origen_min_comentarios` (origen) | 5 | 3 → 54,56 (+0,00) | 8 → 54,56 (+0,00) | — | estable |
+| `origen_ventana_h` (origen) | 12 | 6 → 54,56 (+0,00) | 18 → 54,56 (+0,00) | — | estable |
+| `peso_marcas` (postura) | 20 | 10 → 54,56 (+0,00) | 30 → 54,56 (+0,00) | — | estable |
+| `peso_campana` (postura) | 20 | 10 → 54,56 (+0,00) | 30 → 54,56 (+0,00) | — | estable |
+| `peso_sueltos` (postura) | 0,5 | 0,25 → 54,56 (+0,00) | 0,75 → 54,56 (+0,00) | — | estable |
+| `tope_sueltos` (postura) | 3 | 1,5 → 54,56 (+0,00) | 4,5 → 54,56 (+0,00) | — | estable |
+| `peso_variedad` (postura) | 1 | 0,5 → 54,56 (+0,00) | 1,5 → 54,56 (+0,00) | — | estable |
+| `peso_volumen` (postura) | 1 | 0,5 → 54,56 (+0,00) | 1,5 → 54,56 (+0,00) | — | estable |
+
+No están en la tabla `umbral_sin_hilos` y `largo_ruido_sin_hilos`: solo actúan en el plan B, cuando no hay respuestas.
+
+### Qué significa
+
+**Estables (23 de 29):** todo lo de narrativas menos un caso, todo lo de postura, todo lo de origen, y de coordinación la ventana, el tamaño mínimo de grupo y tres de los cuatro umbrales de la segunda pasada.
+
+**Frágiles, y siempre hacia el mismo lado (aflojar):**
+
+| Parámetro | Paso que lo rompe | Qué pasa | Hacia el otro lado |
+|---|---|---|---|
+| `veces_con_texto` | 2 → 1 | Marca 14.437 cuentas (el 90% del set). Coincidir una sola vez no es evidencia de nada. | 3: sin costo en el set completo; -2,66 en la segunda mitad (pierde cuentas con poca actividad). |
+| `k_truss` | 4 → 3 | Marca 137 cuentas (22 genuinas). Con 2 marca 8.107. | 5: sin ningún costo, ni en el set completo ni en la segunda mitad. 6: sin costo en el set completo. |
+| `veces_sin_texto` | 3 → 2 | Marca 283 cuentas (168 genuinas). | 4 (segunda mitad) y 5 (set completo): sin ningún costo. |
+| `ampliar_min_celdas` | 2 → 1 | Marca 202 cuentas (87 genuinas): entra cualquiera que pasó una vez por una ráfaga. | 3: -0,14 en el set completo, -1,06 en la segunda mitad. |
+| `umbral_micro` | 0,5 → 0,25 | Se pegan frases distintas: origen 0,67 y ruido 0,993. | Con 0,375 no pasa nada: hay margen. Con 0,75 pierde 0,16. |
+
+**Sensible:** `lift_min` a 20 marca 7 cuentas genuinas (-0,52). Entre 30 y 60 no cambia nada.
+
+Para ver dónde está el borde, repetí los que se movieron con ±25%:
+
+Base: total 54,56 · agrup. 1,000 · ruido 1,000 · postura 0,927 · origen 1,000 · coord. F1 1,000 · grupos 1,000
+
+| Parámetro | Valor | x0.75: valor → total (Δ) | x1.25: valor → total (Δ) | Qué se movió | Veredicto |
+|---|---|---|---|---|---|
+| `umbral_micro` (narrativas) | 0,5 | 0,375 → 54,56 (+0,00) | 0,625 → 54,40 (-0,16) | grupos 0,991 (x1.25); 114 cuentas marcadas (x1.25) | estable |
+| `ventana_s` (coordinacion) | 1800 | 1350 → 54,56 (+0,00) | 2250 → 54,56 (+0,00) | — | estable |
+| `lift_min` (coordinacion) | 40 | 30 → 54,56 (+0,00) | 50 → 54,56 (+0,00) | — | estable |
+| `k_truss` (coordinacion) | 4 | 3 → 53,03 (-1,53) | 5 → 54,56 (+0,00) | coord. F1 0,913 (x0.75); 137 cuentas marcadas (x0.75) | **FRÁGIL** |
+
+Y sobre la **segunda mitad de los días** (un recorte más difícil, que no usé para elegir nada), con ±25%:
+
+Base: total 52,70 · agrup. 0,999 · ruido 0,998 · postura 0,808 · origen 1,000 · coord. F1 0,963 · grupos 0,936
+
+| Parámetro | Valor | x0.75: valor → total (Δ) | x1.25: valor → total (Δ) | Qué se movió | Veredicto |
+|---|---|---|---|---|---|
+| `lift_min` (coordinacion) | 40 | 30 → 52,70 (+0,00) | 50 → 52,70 (+0,00) | — | estable |
+| `veces_con_texto` (coordinacion) | 2 | 1 → 35,01 (-17,69) | 3 → 50,04 (-2,66) | coord. F1 0,017 (x0.75); grupos 0,786 (x0.75); 13459 cuentas marcadas (x0.75); coord. F1 0,847 (x1.25); grupos 0,853 (x1.25); 83 cuentas marcadas (x1.25) | **FRÁGIL** |
+| `veces_sin_texto` (coordinacion) | 3 | 2 → 45,07 (-7,63) | 4 → 52,70 (+0,00) | coord. F1 0,528 (x0.75); 285 cuentas marcadas (x0.75) | **FRÁGIL** |
+| `min_pubs_compartidas` (coordinacion) | 1 | 1 → 52,70 (+0,00) | 2 → 52,70 (+0,00) | — | estable |
+| `k_truss` (coordinacion) | 4 | 3 → 52,25 (-0,45) | 5 → 52,70 (+0,00) | coord. F1 0,938 (x0.75); 111 cuentas marcadas (x0.75) | sensible |
+| `ampliar_min_celdas` (coordinacion) | 2 | 1 → 50,58 (-2,12) | 3 → 51,64 (-1,06) | coord. F1 0,836 (x0.75); grupos 0,951 (x0.75); 143 cuentas marcadas (x0.75); coord. F1 0,924 (x1.25); grupos 0,887 (x1.25); 97 cuentas marcadas (x1.25) | **FRÁGIL** |
+
+En la segunda mitad también probé los seis pesos de postura a ±50%: el total no se mueve (52,70 en los doce casos).
+
+### Mi lectura
+
+- **Aviso de fragilidad, como pediste:** `veces_con_texto`, `veces_sin_texto`, `k_truss` y `ampliar_min_celdas` son umbrales enteros y el valor actual es, en los cuatro, **el mínimo que da precisión perfecta en práctica**. Un paso más flojo y aparecen falsos positivos de a decenas o miles. No hay "cambio chico" posible en un entero, así que esto no dice que el sistema sea inestable con los valores actuales; dice que **no tenemos margen de seguridad del lado de los falsos positivos**. Si en el set final las cuentas genuinas coinciden un poco más que en práctica, lo vamos a pagar en precisión.
+- `k_truss=5` y `veces_sin_texto=4` darían ese margen **gratis** (cero costo medido en el set completo y en las dos mitades). `veces_con_texto` y `ampliar_min_celdas` no se pueden endurecer sin perder cuentas reales.
+- Los pesos de postura no son frágiles, pero por una mala razón: no importan. Las narrativas con marcas de desmentida o con campaña se deciden por mucho margen, y las que no tienen ninguna de las dos se deciden por indicios tan débiles que salen igual con cualquier peso.
+
+## 3. Controles de cordura sobre la salida de práctica
+
+| Control | Resultado | Referencia en práctica | ¿Absurdo? |
+|---|---|---|---|
+| Narrativas encontradas | **13** | 13 | No |
+| Tamaño de las narrativas | de 3.513 a 18.463 comentarios; la mayor es el 11% | de 3.513 a 18.463 | No: coinciden una por una con las reales |
+| Comentarios marcados como ruido | **37.710 (18,9%)** | 37.710 (18,9%) | No |
+| Cuentas marcadas como coordinadas | **115 de 15.991 (0,72%)** | 115 | No |
+| Grupos y tamaños | **3 grupos: 60, 30 y 25 cuentas** | 60, 30 y 25 | No |
+
+Esto es lo que imprime ahora el pipeline al terminar:
+
+```
+Validación de salida\practica: OK, cumple el formato del enunciado
+Controles de cordura: sin alertas
+  narrativas: 13 (la mayor tiene el 11% de los comentarios con narrativa; la menor, 3513 comentarios)
+  ruido: 18.9% de los comentarios
+  cuentas coordinadas: 115 de 15991 (0.72%) en 3 grupos, de tamaños 60, 30, 25
+```
+
+Los controles sí saltan cuando tienen que saltar. Sin respuestas avisa "una sola narrativa junta el 83% de los comentarios"; con `veces_con_texto=1` avisaría que marcó el 90% de las cuentas. Lo que **no** detectan es un error chico: un grupo falso de 5 cuentas pasa sin alerta (ver punto 7).
+
+## 4. Generalización: mitades de días, sin respuestas y con la mitad de las respuestas borradas
+
+Cada recorte se corre de punta a punta en otro proceso y se mide con el evaluador oficial contra la verdad recortada igual. Entre paréntesis, lo que hay de verdad en ese recorte. En "Origen", la verdad se rehízo para el recorte (primer comentario de la narrativa adentro del recorte, y solo cuenta la que nace adentro).
+
+| Recorte | Comentarios | Narrativas (hay) | Ruido | Agrup. F1 | Ruido F1 | Postura | Origen | Coord. P / R | Marcadas (hay) | Grupos | Total /55 | Tiempo | Memoria |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| completo | 200.000 | 13 (13) | 18,9% | 1,000 | 1,000 | 0,927 | 1,00 | 1,00 / 1,00 | 115 (115) | 60, 30, 25 | 54,56 | 33 s | 645 MB |
+| primera_mitad | 100.884 | 12 (12) | 18,9% | 1,000 | 1,000 | 0,901 | 1,00 | 0,99 / 1,00 | 115 (114) | 59, 31, 25 | 54,33 | 18 s | 451 MB |
+| segunda_mitad | 99.116 | 13 (13) | 18,9% | 0,999 | 0,998 | 0,808 | 1,00 | 1,00 / 0,93 | 105 (113) | 59, 24, 22 | 52,70 | 18 s | 422 MB |
+| sin_respuestas | 200.000 | 24 (13) | 15,8% | 0,376 | 0,725 | 0,337 | 0,00 | 1,00 / 0,98 | 113 (115) | 60, 28, 25 | 35,65 | 40 s | 612 MB |
+| mitad_enlaces | 200.000 | 13 (13) | 18,5% | 0,966 | 0,982 | 0,883 | 0,67 | 1,00 / 0,99 | 114 (115) | 59, 30, 25 | 52,06 | 53 s | 593 MB |
+| mitad_respuestas_borradas | 185.908 | 13 (13) | 20,4% | 0,998 | 0,996 | 0,822 | 1,00 | 1,00 / 0,99 | 114 (115) | 59, 30, 25 | 53,74 | 44 s | 597 MB |
+| muestra_20k_a | 20.047 | 14 (13) | 18,6% | 0,997 | 0,995 | 0,999 | 1,00 | 1,00 / 0,33 | 22 (67) | 16, 6 | 40,41 | 7 s | 261 MB |
+| muestra_20k_b | 20.415 | 13 (13) | 19,1% | 0,998 | 0,995 | 0,893 | 1,00 | 1,00 / 0,08 | 5 (60) | 5 | 32,60 | 8 s | 258 MB |
+| muestra_20k_c | 21.422 | 14 (13) | 19,6% | 0,994 | 0,980 | 0,971 | 0,49 | 0,00 / 0,00 | 5 (36) | 5 | 28,51 | 10 s | 359 MB |
+
+Qué es cada recorte:
+
+- **primera_mitad / segunda_mitad**: días 1 a 7 y días 8 a 14.
+- **sin_respuestas**: `respuesta_a` vacío en todos los comentarios.
+- **mitad_enlaces**: `respuesta_a` vacío en la mitad de las respuestas, al azar. El comentario queda, pero suelto.
+- **mitad_respuestas_borradas**: se borra la mitad de las respuestas, al azar. El comentario desaparece.
+- **muestra_20k_a/b/c**: punto 7.
+
+### Comparación
+
+- **Primera mitad contra segunda mitad:** narrativas y ruido iguales (1,000 y 0,999). La diferencia está en dos lugares. Postura: 0,90 contra 0,81. En las dos mitades quedan al revés dos narrativas: la de la licitación en ambas, y otra que cambia según la mitad (la de los turnos en la primera, la de los médicos en la segunda), porque depende de indicios débiles. Coordinación: 115 de 114 marcadas contra 105 de 113; en la segunda mitad la campaña de cuentas viejas actúa menos veces y se pierden 8 cuentas. En la primera mitad hay **un falso positivo** (una cuenta genuina sumada al grupo de cuentas viejas en la segunda pasada).
+- **Sin `respuesta_a`:** narrativas 0,376, ruido 0,725, postura 0,337, origen 0. Encuentra 24 "narrativas" y una tiene el 83% de los comentarios. La coordinación sigue andando (113 de 115, sin falsos positivos) porque usa solo publicación y tiempo. Es el punto débil conocido: **todo el análisis de narrativas depende de que haya respuestas.**
+- **Mitad de los enlaces borrados:** aguanta (agrupamiento 0,966, ruido 0,982), pero aparece un problema nuevo. Las frases de acuerdo que perdieron su enlace ("ni más ni menos", sueltas desde el día 1) terminan asignadas a una narrativa, y como el origen es "el primer comentario con compañía", **la fecha de origen de esa narrativa se corre nueve días** (del 10 de septiembre al 1). Origen cae a 0,67.
+- **Mitad de las respuestas borradas:** casi no se nota en narrativas (0,998) ni en coordinación. Baja la postura (0,82); no investigué cuál narrativa se dio vuelta, pero es esperable: con menos contradicciones hay menos indicios para orientar.
+
+## 5. Ejemplos reales para revisar a ojo
+
+Elegidos al azar con semilla fija (`python verificacion/ejemplos.py`), sin mirar si estaban bien. La columna "Verdad" es la etiqueta real de práctica, para comparar. Narrativas: la más grande, la del medio y la más chica.
+
+### Comentarios al azar
+
+**n01** — «Los pozos se están secando desde que llegó la minera esa.» (18.463 comentarios)
+
+| Comentario | Texto | Tipo | Postura asignada | Verdad |
+|---|---|---|---|---|
+| c0001307 | nos dejan sin agua para que la minera saque el litio. | respuesta | apoya | L1 apoya |
+| c0004086 | Para mí cada día hay menos agua en Villa Tolar y nadie dice nada de la minera, lo digo en serio. | suelto | apoya | L1 apoya |
+| c0007795 | como siempre, la salmuera no es agua potable, dejen de mezclar las cosas. así estamos. | suelto | rechaza | L1 rechaza |
+| c0023660 | falso que la mina deja sin agua al pueblo, usan agua salada que no es para consumo, te juro. | suelto | rechaza | L1 rechaza |
+| c0033496 | Te digo algo: el problema del agua en Tolar es la red vieja, no la minera eh. 🙄 | suelto | rechaza | L1 rechaza |
+| c0037499 | COINCIDO | respuesta | rechaza | L1 rechaza |
+| c0074094 | Y el agua? 💧 | suelto | apoya | L1 apoya |
+| c0096852 | Primero el agua de la gente, después el litio. | suelto | apoya | L1 apoya |
+| c0154733 | Hay q decirlo: sin vegas no hay ganado, y el bombeo las está secando. 😡 | suelto | apoya | L1 apoya |
+| c0160112 | jaja mentira que la mina deja sin agua al pueblo, usan agua salada que no es para consumo. despierten. | suelto | rechaza | L1 rechaza |
+
+En esta muestra: 10 de 10 son de la misma narrativa real (L1); 10 de 10 tienen la postura correcta.
+
+**n07** — «Pedí turno en marzo y me lo dieron para agosto.» (12.537 comentarios)
+
+| Comentario | Texto | Tipo | Postura asignada | Verdad |
+|---|---|---|---|---|
+| c0011096 | Ahora se sacan por teléfono y salen más rápido. 💯 | respuesta | rechaza | H4 rechaza |
+| c0041874 | Con el nuveo sistema online mejoró bastante. | suelto | rechaza | H4 rechaza |
+| c0067475 | Hay que decirlo: las demoras son por falta de especialistas, no del sistema de turnos. 👏 | respuesta | rechaza | H4 rechaza |
+| c0075709 | Sinceramente a mí me atendieron en una semana, depende de la especialidad. Es así. | suelto | rechaza | H4 rechaza |
+| c0109286 | Para un turno con el traumatólogo me dieron para dentro de seis meses. 😡 | respuesta | apoya | H4 apoya |
+| c0111558 | Para mí hay que ir a las 4 de la mañana a hacer fila para un turno. | suelto | apoya | H4 apoya |
+| c0145595 | Ojo, pedí turno en marzo y me lo dieron para agosto. 🤬 | respuesta | apoya | H4 apoya |
+| c0154194 | Los turnos tardan meses, la gente se muere esperando. 😔 | suelto | apoya | H4 apoya |
+| c0182984 | con el nuevo sistema online mejoró bastante. 🤬 | suelto | rechaza | H4 rechaza |
+| c0183137 | Jaja pedi turno en marzo y me lo dieron para agosto. Triste. | respuesta | apoya | H4 apoya |
+
+En esta muestra: 10 de 10 son de la misma narrativa real (H4); 10 de 10 tienen la postura correcta.
+
+**n13** — «Ya van a cortar la cinta en campaña aunque no haya ni camas.» (3.513 comentarios)
+
+| Comentario | Texto | Tipo | Postura asignada | Verdad |
+|---|---|---|---|---|
+| c0094520 | la verdad que todo para la foto electoral, el hospital es una excusa. abran los ojos. | suelto | apoya | H3 apoya |
+| c0095209 | Ojo, todo para la foto electoral, el hospital es una excusa. Qué bronca. | suelto | apoya | H3 apoya |
+| c0104917 | siempre buscan la vuelta para criticar, el nosocomio hace falta. 💯 | suelto | rechaza | H3 rechaza |
+| c0108039 | 100% de acuerdo | respuesta | rechaza | H3 rechaza |
+| c0109373 | Lo van a inaugurar justo antes de las elecciones, para la foto. Así estamos. | suelto | apoya | H3 apoya |
+| c0111771 | para mi todo para la foto electoral, el hospital es una excusa. abran los ojos. | respuesta | apoya | H3 apoya |
+| c0113307 | che, el hospital lo terminan en campaña, siempre lo mismo. abran los ojos. | suelto | apoya | H3 apoya |
+| c0120765 | Che, si lo terminan no importa cuando, importa que funcione. Lamentable. | suelto | rechaza | H3 rechaza |
+| c0151542 | che, ya van a cortar la cinta en campaña aunque no haya ni camas. | suelto | apoya | H3 apoya |
+| c0154928 | escuchen: inauguran el nosocomio vacío para la foto y después lo cierran. | suelto | apoya | H3 apoya |
+
+En esta muestra: 10 de 10 son de la misma narrativa real (H3); 10 de 10 tienen la postura correcta.
+
+**ninguna** — «comentarios marcados como ruido» (10 de muestra)
+
+| Comentario | Texto | Tipo | Postura asignada | Verdad |
+|---|---|---|---|---|
+| c0008199 | Buen día a todos | suelto | — | ninguna  |
+| c0017390 | Hay que pedir turno por teléfono o presencial? | suelto | — | ninguna  |
+| c0019098 | Comparto | suelto | — | ninguna  |
+| c0036232 | HAY VIDEO DE LA AUDIENCIA? | suelto | — | ninguna  |
+| c0036632 | Mmm no sé | suelto | — | ninguna  |
+| c0047493 | Fuerza! | suelto | — | ninguna  |
+| c0116450 | alguien sabe a que hora es la asamblea? | suelto | — | ninguna  |
+| c0160192 | Primero! | suelto | — | ninguna  |
+| c0162273 | desde cuándo rige? | suelto | — | ninguna  |
+| c0174116 | y el estudiantil cuánto queda? | suelto | — | ninguna  |
+
+En esta muestra: 10 de 10 son ruido de verdad.
+
+### Cuentas marcadas como coordinadas y por qué
+
+- **g01**: 60 cuentas, 60 en el núcleo (malla densa) y 0 sumadas en la segunda pasada. Fechas de creación en un rango de 3 días (camada: franja rara en el set, cuenta como indicio).
+- **g02**: 30 cuentas, 29 en el núcleo (malla densa) y 1 sumadas en la segunda pasada. Fechas de creación en un rango de 2042 días (no forman camada: la antigüedad no se usó).
+- **g03**: 25 cuentas, 25 en el núcleo (malla densa) y 0 sumadas en la segunda pasada. Fechas de creación en un rango de 5 días (camada: franja rara en el set, cuenta como indicio).
+
+| Cuenta | Grupo | Cómo entró | Pares fuertes dentro del grupo | Más veces con un mismo par | Lift máximo | Comentarios (en ráfaga con el grupo) | Su mayor ráfaga | Creada | Verdad |
+|---|---|---|---|---|---|---|---|---|---|
+| u009823 | g01 | núcleo: malla densa de pares fuertes | 36 de 59 | 4 | 936 | 6 (5) | p00135, 04/09 18:53: 26 cuentas más del grupo en ±15 min | 2026-08-29 | C1 |
+| u011408 | g01 | núcleo: malla densa de pares fuertes | 52 de 59 | 5 | 933 | 9 (8) | p00135, 04/09 18:50: 26 cuentas más del grupo en ±15 min | 2026-08-29 | C1 |
+| u012344 | g01 | núcleo: malla densa de pares fuertes | 53 de 59 | 7 | 779 | 10 (9) | p00302, 09/09 16:47: 26 cuentas más del grupo en ±15 min | 2026-08-27 | C1 |
+| u012760 | g01 | núcleo: malla densa de pares fuertes | 19 de 59 | 3 | 1186 | 4 (3) | p00070, 02/09 19:21: 24 cuentas más del grupo en ±15 min | 2026-08-26 | C1 |
+| u002416 | g02 | núcleo: malla densa de pares fuertes | 21 de 29 | 5 | 301 | 19 (8) | p00018, 01/09 14:55: 12 cuentas más del grupo en ±15 min | 2020-05-07 | C2 |
+| u003533 | g02 | núcleo: malla densa de pares fuertes | 10 de 29 | 4 | 268 | 17 (6) | p00017, 01/09 14:49: 13 cuentas más del grupo en ±15 min | 2024-10-16 | C2 |
+| u009692 | g02 | segunda pasada: coincide con el grupo como conjunto | 3 de 29 | 3 | 229 | 15 (3) | p00096, 03/09 19:17: 13 cuentas más del grupo en ±15 min | 2025-06-24 | C2 |
+| u000798 | g03 | núcleo: malla densa de pares fuertes | 19 de 24 | 4 | 3569 | 5 (5) | p00342, 11/09 02:44: 17 cuentas más del grupo en ±15 min | 2026-08-30 | C3 |
+| u001029 | g03 | núcleo: malla densa de pares fuertes | 23 de 24 | 5 | 2891 | 7 (7) | p00342, 11/09 02:38: 17 cuentas más del grupo en ±15 min | 2026-08-30 | C3 |
+| u014047 | g03 | núcleo: malla densa de pares fuertes | 12 de 24 | 3 | 3657 | 3 (3) | p00342, 11/09 02:39: 17 cuentas más del grupo en ±15 min | 2026-08-30 | C3 |
+
+### El caso que esa muestra no deja ver
+
+Las tres narrativas de arriba salieron con 30 de 30 posturas correctas, pero eso es suerte en la elección: hay una narrativa con la postura **entera al revés**. La agrego para que la vean (`python verificacion/ejemplos.py --narrativas n08`):
+
+**n08** — «Nadie quiere venir a dar el servicio acá, no es negocio.» (11.848 comentarios)
+
+| Comentario | Texto | Tipo | Postura asignada | Verdad |
+|---|---|---|---|---|
+| c0028240 | lo mismo digo | respuesta | apoya | B3 rechaza |
+| c0041711 | Te digo algo: hace veinte años que están las mismas empresas, basta. 😔 | suelto | rechaza | B3 apoya |
+| c0053476 | sinceramente hay que llamar a licitación y que entren otras empresas. qué bronca. | suelto | rechaza | B3 apoya |
+| c0086463 | Con otra compañía el boleto sería más caro. 🙄 | suelto | apoya | B3 rechaza |
+| c0102970 | Como siempre, licitar para que ganen los mismos de siempre, no cambia nada. | respuesta | apoya | B3 rechaza |
+| c0110361 | ojo, licitacion ya, que vnegan empresas que inviertan. 💯 | suelto | rechaza | B3 apoya |
+| c0142311 | Jaja una lciitacion tarda años, no es la solucion. 🙄 | suelto | apoya | B3 rechaza |
+| c0163975 | Che, licitar para que ganen los misoms de siempre, no cambia nada, te juro. Asi estamos. | suelto | apoya | B3 rechaza |
+| c0181235 | Clarísimo | respuesta | apoya | B3 rechaza |
+| c0185252 | A ver, con otra compañía el boleto sería más caro. | suelto | apoya | B3 rechaza |
+
+En esta muestra: 10 de 10 son de la misma narrativa real (B3); 0 de 10 tienen la postura correcta.
+
+Los comentarios están bien agrupados y bien separados en dos bandos; lo que está mal es cuál bando se llamó "apoya". La narrativa real es "hay que llamar a licitación", y el pipeline tomó como afirmación la respuesta ("licitar no cambia nada"). Por eso el título que le puso también es el del bando equivocado.
+
+### Qué mirar en las cuentas marcadas
+
+- "Pares fuertes dentro del grupo": con cuántas otras cuentas del grupo coincide varias veces y muy por encima del azar. Ojo: este número solo dice algo en grupos grandes. En el grupo falso de 5 cuentas del punto 7, cada una tenía 4 de 4.
+- "Comentarios (en ráfaga con el grupo)": casi todo lo que hacen las de g01 y g03 es en ráfaga. Las de g02 tienen 15-19 comentarios y solo 3-8 en ráfaga: el resto es cobertura. Es la campaña difícil.
+- La cuenta que entró por la segunda pasada (u009692) tiene solo 3 pares fuertes: sola no formaba malla, pero aparece tres veces en ráfagas dominadas por el grupo.
+- En práctica las diez son campaña de verdad.
+
+## 6. Dos corridas seguidas: mismos archivos, tiempo y memoria
+
+Corrí el pipeline completo cuatro veces seguidas en el entorno `.venv`, cada una a su carpeta y su base:
+
+| Corrida | Tiempo total | Memoria pico | Estado de la notebook |
+|---|---|---|---|
+| 1 | 176,8 s | 424 MB | 0,45 GB de RAM libre y CPU al 60% (medido al terminar la corrida 2) |
+| 2 | 148,6 s | 427 MB | igual |
+| 3 | 50,8 s | 654 MB | 1 GB de RAM libre |
+| 4 | 48,6 s | 649 MB | igual |
+
+- `comentarios.csv`, `narrativas.csv` y `cuentas.csv` son **idénticos byte a byte en las cuatro** (mismo md5) e idénticos a la salida de antes de los cambios de hoy. `costo.json` cambia, como corresponde: lleva el tiempo.
+- Puntaje de esas corridas: **54,56 / 55**.
+- **El tiempo varió 3,5 veces sin cambiar nada del código.** En las corridas 1 y 2 la máquina tenía menos de medio giga libre (Discord, Brave, el editor y un proceso de vista web ocupaban entre 200 y 470 MB cada uno) y Windows le fue sacando memoria al proceso: por eso el "pico" medido es más bajo (424 MB) y todo tarda el triple. Con 1 GB libre, 49-51 s. Ayer, con la máquina descansada, 27 s.
+- Qué etapa manda: narrativas (14 s) y coordinación (16 s) en una corrida normal; ingesta 11 s; validación 5 s.
+- **Para el viernes:** cerrar todo lo que se pueda antes de correr. El resultado no cambia, pero el tiempo queda escrito en `costo.json` y es lo que mira el jurado.
+
+## 7. Muestra chica: 20.000 comentarios de publicaciones completas
+
+Tres muestras distintas: publicaciones completas elegidas al azar hasta juntar 20.000 comentarios, con todos sus hilos (las respuestas siempre son de la misma publicación). Están en la tabla del punto 4.
+
+| | Muestra a | Muestra b | Muestra c | Set completo |
+|---|---|---|---|---|
+| Total /55 | 40,41 | 32,60 | 28,51 | 54,56 |
+| Agrupamiento F1 | 0,997 | 0,998 | 0,994 | 1,000 |
+| Ruido F1 | 0,995 | 0,995 | 0,980 | 1,000 |
+| Postura | 0,999 | 0,893 | 0,971 | 0,927 |
+| Origen | 1,00 | 1,00 | 0,49 | 1,00 |
+| Cuentas coordinadas: marcadas (hay) | 22 (67) | 5 (60) | 5 (36) | 115 (115) |
+| Coordinación: precisión / recall | 1,00 / 0,33 | 1,00 / 0,08 | **0,00** / 0,00 | 1,00 / 1,00 |
+| Tiempo | 7 s | 8 s | 10 s | 27-51 s |
+
+### Qué se puede probar rápido y qué necesita el set completo
+
+| Parte | ¿Sirve la muestra chica? | Por qué |
+|---|---|---|
+| Agrupamiento de narrativas | **Sí** (0,994 a 0,998) | Con 20.000 comentarios ya hay cientos de respuestas por narrativa. |
+| Ruido | **Sí** (0,980 a 0,995) | Las frases de ruido son muy repetidas; alcanzan pocas apariciones. Lo que baja un poco es que algunas frases no llegan al mínimo para que la prueba sea concluyente. |
+| Separar los dos bandos | **Sí** | Sale del mismo grafo que las narrativas. |
+| Orientar la postura | A medias (0,89 a 1,00) | Varía según qué narrativas tengan marcas de desmentida en la muestra. No dice nada sobre el set completo. |
+| Fecha de origen | **No confiable** (1,00, 1,00 y 0,49) | Con pocos comentarios, los primeros de una narrativa quedan muy separados y la regla "5 comentarios en 12 horas" salta al primer momento denso (un día después). Además, una frase de ruido mal asignada corre el origen varios días. |
+| Coordinación | **No** (recall 0,00 a 0,33) | Necesita que las mismas cuentas coincidan en **varias** publicaciones. En la muestra entra una o dos ráfagas de cada campaña. No es un error: en esas muestras no hay evidencia para encontrarlas. |
+
+Para iterar rápido: cambios en texto, microgrupos, ruido o narrativas se pueden probar en 10 segundos con una muestra. Cualquier cambio en coordinación, origen u orientación de postura hay que medirlo en el set completo (o en una mitad).
+
+### El falso positivo de la muestra c (esto sí es un defecto)
+
+En la muestra c el pipeline marcó un grupo de 5 cuentas y **las 5 son genuinas**. Lo investigué:
+
+- La muestra tiene 39 publicaciones y una sola, viral, tiene 6.793 de los 21.422 comentarios.
+- Esas 5 cuentas tienen 2 comentarios cada una en la muestra, los dos en esa publicación: uno entre las 05:04 y las 05:28 y otro entre las 06:04 y las 06:22, todos apoyando la misma narrativa. En esas dos ventanas había 315 y 170 cuentas diciendo lo mismo.
+- Coincidieron "2 veces", que es el mínimo. Y como tienen solo 2 comentarios cada una, lo "esperable por azar" que calcula el pipeline es casi cero, así que el cociente da 49 (el umbral es 40). Las diez parejas posibles pasan, forman una malla perfecta de 5 y el pipeline las llama operación.
+- En el set completo las mismas 5 cuentas tienen entre 4 y 34 comentarios, el cociente baja a entre 2 y 64 según el par, la malla no se forma y **no se marcan**.
+
+El defecto de fondo: **dos coincidencias dentro de la misma publicación viral cuentan como "repetición"**, y la comparación contra el azar favorece a las cuentas con muy poca actividad. En el set completo no se manifestó, pero el set final puede tener publicaciones más grandes o cuentas menos activas.
+
+**Arreglo probado, no activado:** pedir que un par fuerte comparta al menos 2 publicaciones distintas (`min_pubs_compartidas=2`). Lo corrí en los nueve recortes:
+
+| Recorte | Actual: total, marcadas, P / R | [min_pubs_compartidas=2] | [k_truss=5] [veces_sin_texto=4] [min_pubs_compartidas=2] |
+|---|---|---|---|
+| completo | 54,56, 115, 1,00 / 1,00 | 54,56, 115, 1,00 / 1,00 | 54,56, 115, 1,00 / 1,00 |
+| primera_mitad | 54,33, 115, 0,99 / 1,00 | 54,33, 115, 0,99 / 1,00 | 54,33, 115, 0,99 / 1,00 |
+| segunda_mitad | 52,70, 105, 1,00 / 0,93 | 52,70, 105, 1,00 / 0,93 | 52,70, 105, 1,00 / 0,93 |
+| sin_respuestas | 35,65, 113, 1,00 / 0,98 | 35,65, 113, 1,00 / 0,98 | 35,24, 110, 1,00 / 0,96 |
+| mitad_enlaces | 52,06, 114, 1,00 / 0,99 | 52,06, 114, 1,00 / 0,99 | 51,92, 113, 1,00 / 0,98 |
+| mitad_respuestas_borradas | 53,74, 114, 1,00 / 0,99 | 53,74, 114, 1,00 / 0,99 | 53,74, 114, 1,00 / 0,99 |
+| muestra_20k_a | 40,41, 22, 1,00 / 0,33 | 40,41, 22, 1,00 / 0,33 | 40,41, 22, 1,00 / 0,33 |
+| muestra_20k_b | 32,60, 5, 1,00 / 0,08 | 32,60, 5, 1,00 / 0,08 | 32,60, 5, 1,00 / 0,08 |
+| muestra_20k_c | 28,51, 5, 0,00 / 0,00 | 28,51, 0, 0,00 / 0,00 | 28,51, 0, 0,00 / 0,00 |
+
+Cada celda es total, cuentas marcadas y precisión / recall. Con `min_pubs_compartidas=2` el falso grupo de la muestra c desaparece y **los otros ocho recortes quedan exactamente igual**. La tercera columna suma además `k_truss=5` y `veces_sin_texto=4` (el margen de seguridad del punto 2): igual en siete recortes, y pierde 1 y 3 cuentas en los dos recortes con hilos rotos.
+
+## Qué recomiendo (decisiones para ustedes)
+
+1. **Activar `min_pubs_compartidas=2`.** Es coherente con la idea del método (repetir es coincidir en lugares distintos, no dos veces en el mismo momento viral), arregla el único falso grupo que vi y no cambia nada más. Riesgo: una operación que actúa siempre en una sola publicación dejaría de verse. Para probarlo sin tocar el código: `python -m pipeline.run --datos ... --entrega ... --param min_pubs_compartidas=2`. Para dejarlo fijo, es cambiar un 1 por un 2 en `pipeline/parametros.py`.
+2. **Considerar `k_truss=5` y `veces_sin_texto=4`** para tener margen contra falsos positivos. Costo medido: nada en el set completo ni en las mitades; 1 a 3 cuentas en los recortes con hilos rotos. Yo lo haría, pero es menos claro que el punto 1: si las campañas del set final repiten menos que las de práctica, se pierde algo de recall.
+3. **No tocar** `veces_con_texto` ni `ampliar_min_celdas`: están en el único valor que funciona.
+4. **Postura:** confirmado que no se arregla con parámetros. Sigue en pie la opción de una sola llamada a un modelo de lenguaje, que ustedes decidieron no usar por ahora.
+5. **El viernes, mirar los controles de cordura antes de entregar.** Si aparece una alerta, o si los grupos son muchos y chicos (varios de 5 o 6 cuentas), desconfiar de la coordinación.
+
+## Lo que esta verificación no cubre
+
+- Todas las pruebas usan recortes **del mismo set de práctica**: mismos temas, mismas tres campañas, mismo generador. Miden si el método aguanta menos datos y datos rotos; no miden si aguanta **otro estilo de campaña** u otra forma de escribir. Eso solo se va a saber con el set final.
+- La sensibilidad mueve los parámetros de a uno. No probé combinaciones, salvo la de la recomendación 2.
+- No probé con otra semilla (solo la usa Louvain, y la partición sale igual con resolución 0,5, 1 y 1,5, así que espero que no importe; no lo medí).
+- Sigue sin medirse una corrida con millones de comentarios.

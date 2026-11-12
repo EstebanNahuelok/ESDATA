@@ -165,7 +165,7 @@ def validar_entrega(entrega, datos=None) -> tuple:
         if filas and not usadas:
             avisos.append("comentarios.csv: ningún comentario tiene narrativa")
         resumen.update({"comentarios": len(filas), "comentarios_con_narrativa": sum(usadas.values()),
-                        "narrativas_usadas": len(usadas)})
+                        "narrativas_usadas": len(usadas), "tam_narrativas": sorted(usadas.values(), reverse=True)})
 
     if "narrativas.csv" in tablas:
         filas = tablas["narrativas.csv"]
@@ -202,7 +202,8 @@ def validar_entrega(entrega, datos=None) -> tuple:
             avisos.append(f"cuentas.csv: {len(de_una)} grupos con una sola cuenta (ej. {de_una[0]})")
         if filas and not grupos:
             avisos.append("cuentas.csv: ninguna cuenta quedó marcada como coordinada")
-        resumen.update({"cuentas": len(filas), "cuentas_coordinadas": sum(grupos.values()), "grupos": len(grupos)})
+        resumen.update({"cuentas": len(filas), "cuentas_coordinadas": sum(grupos.values()), "grupos": len(grupos),
+                        "tam_grupos": sorted(grupos.values(), reverse=True)})
 
     ruta_costo = entrega / "costo.json"
     if ruta_costo.is_file():
@@ -237,11 +238,54 @@ def validar_entrega(entrega, datos=None) -> tuple:
     return errores, avisos, resumen
 
 
+def controles_de_cordura(resumen: dict) -> tuple:
+    """Números que conviene mirar antes de entregar, y alertas si alguno es raro.
+
+    No miden si el resultado es correcto (para eso hace falta la verdad): detectan resultados absurdos, como una
+    sola narrativa gigante, cientos de narrativas, casi todo ruido o miles de cuentas marcadas. Los rangos son
+    amplios a propósito y no salen del set de práctica. Devuelve (líneas descriptivas, alertas).
+    """
+    lineas, alertas = [], []
+    total, con_narrativa = resumen.get("comentarios", 0), resumen.get("comentarios_con_narrativa", 0)
+    tam = resumen.get("tam_narrativas", [])
+    if total:
+        ruido = 100 * (total - con_narrativa) / total
+        lineas.append(f"narrativas: {len(tam)}" + (f" (la mayor tiene el {100 * tam[0] / max(con_narrativa, 1):.0f}% de los "
+                      f"comentarios con narrativa; la menor, {tam[-1]} comentarios)" if tam else ""))
+        lineas.append(f"ruido: {ruido:.1f}% de los comentarios")
+        if len(tam) < 2:
+            alertas.append(f"hay {len(tam)} narrativas: se esperan varias")
+        elif len(tam) > 60:
+            alertas.append(f"hay {len(tam)} narrativas: son demasiadas, probablemente el agrupamiento quedó fragmentado")
+        if len(tam) >= 3 and tam[0] > 0.5 * con_narrativa:
+            alertas.append(f"una sola narrativa junta el {100 * tam[0] / con_narrativa:.0f}% de los comentarios: puede haber narrativas pegadas")
+        chicas = sum(1 for t in tam if t < max(20, 0.001 * total))
+        if tam and chicas > len(tam) / 3:
+            alertas.append(f"{chicas} de {len(tam)} narrativas son muy chicas (menos del 0,1% de los comentarios)")
+        if ruido < 2 or ruido > 60:
+            alertas.append(f"el ruido es {ruido:.1f}% de los comentarios: fuera del rango razonable (2% a 60%)")
+    cuentas, coordinadas, grupos = resumen.get("cuentas", 0), resumen.get("cuentas_coordinadas", 0), resumen.get("tam_grupos", [])
+    if cuentas:
+        lineas.append(f"cuentas coordinadas: {coordinadas} de {cuentas} ({100 * coordinadas / cuentas:.2f}%) en {len(grupos)} grupos"
+                      + (f", de tamaños {', '.join(map(str, grupos[:12]))}" + ("..." if len(grupos) > 12 else "") if grupos else ""))
+        if not grupos:
+            alertas.append("no se marcó ninguna cuenta coordinada: o no hay operaciones o no llegan a repetirse lo suficiente")
+        if coordinadas > 0.05 * cuentas:
+            alertas.append(f"se marcó el {100 * coordinadas / cuentas:.1f}% de las cuentas como coordinadas: es mucho, revisar falsos positivos")
+        if grupos and grupos[0] > max(0.03 * cuentas, 200):
+            alertas.append(f"el grupo más grande tiene {grupos[0]} cuentas: puede ser gente genuina pegada por un momento viral")
+        if len(grupos) > 30:
+            alertas.append(f"hay {len(grupos)} grupos coordinados: son muchos, revisar")
+    return lineas, alertas
+
+
 def informe(entrega, errores: list, avisos: list, resumen: dict) -> str:
     lineas = [f"Validación de {entrega}: " + ("OK, cumple el formato del enunciado" if not errores else f"{len(errores)} ERRORES")]
-    if resumen:
-        lineas.append("  " + ", ".join(f"{k}={v}" for k, v in resumen.items()))
     lineas += [f"  ERROR: {e}" for e in errores] + [f"  aviso: {a}" for a in avisos]
+    descripcion, alertas = controles_de_cordura(resumen)
+    if descripcion:
+        lineas.append("Controles de cordura: " + ("sin alertas" if not alertas else f"{len(alertas)} ALERTAS, revisar antes de entregar"))
+        lineas += [f"  {d}" for d in descripcion] + [f"  ALERTA: {a}" for a in alertas]
     return "\n".join(lineas)
 
 

@@ -10,7 +10,8 @@ from .origen import a_iso, fecha_origen
 
 
 def describir_narrativas(nar: Narrativas, bando: np.ndarray, signo: np.ndarray, textos: list, n_textos: np.ndarray,
-                         ts: np.ndarray, zona_seg: int, n_frases: int = 6) -> tuple:
+                         ts: np.ndarray, zona_seg: int, n_frases: int = 6, origen_min_comentarios: int = 5,
+                         origen_ventana_h: float = 12.0) -> tuple:
     """Devuelve (etiqueta por comunidad, filas para narrativas.csv). Etiquetas n01, n02... por tamaño."""
     n_com = int(nar.comunidad.max()) + 1 if len(nar.comunidad) else 0
     tam_com = np.bincount(nar.narrativa[nar.narrativa >= 0], minlength=n_com)
@@ -48,7 +49,8 @@ def describir_narrativas(nar: Narrativas, bando: np.ndarray, signo: np.ndarray, 
                 frases.append(termino)
             if len(frases) == n_frases:
                 break
-        origen = fecha_origen(ts[(nar.narrativa == c) & ~np.isnan(ts)])
+        origen = fecha_origen(ts[(nar.narrativa == c) & ~np.isnan(ts)], minimo=origen_min_comentarios,
+                              ventana_s=int(origen_ventana_h * 3600))
         # Sin ninguna fecha válida en la narrativa se usa la primera fecha del set (el formato exige una fecha).
         filas.append({"narrativa": etiquetas[c], "titulo": titulo or etiquetas[c],
                       "frases_clave": "|".join(frases) or etiquetas[c],

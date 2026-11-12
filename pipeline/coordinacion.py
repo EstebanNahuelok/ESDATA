@@ -84,7 +84,7 @@ def _camada(creada_ts, miembros, max_rareza=0.02, min_validos=5):
 
 
 def _ampliar(grupos, matrices, cuenta, n_cuentas, lift_min, creada_ts=None, min_celdas=2, min_miembros=3,
-             min_fraccion=1 / 3, rondas=3):
+             min_fraccion=1 / 3, rondas=3, max_rareza=0.02):
     """Suma a cada grupo las cuentas que coinciden con el grupo como conjunto.
 
     Una cuenta con poca actividad puede no llegar a repetir con ningún par en particular, pero sí aparecer
@@ -102,7 +102,7 @@ def _ampliar(grupos, matrices, cuenta, n_cuentas, lift_min, creada_ts=None, min_
         mejor_grupo = -np.ones(n_cuentas, dtype=np.int64)
         for g in range(len(grupos)):
             es_miembro = (grupo_de == g).astype(np.float32)
-            camada = _camada(creada_ts, np.flatnonzero(grupo_de == g))
+            camada = _camada(creada_ts, np.flatnonzero(grupo_de == g), max_rareza)
             for M, _Mp in matrices:
                 if M.shape[1] == 0:
                     continue
@@ -128,7 +128,8 @@ def _ampliar(grupos, matrices, cuenta, n_cuentas, lift_min, creada_ts=None, min_
 
 def detectar_coordinacion(n_cuentas, cuenta, pub, ts, narrativa, bando, ventana_s=1800, lift_min=40.0,
                           veces_con_texto=2, veces_sin_texto=3, k_truss=4, min_grupo=5, max_aristas=200000,
-                          ampliar=True, creada_ts=None, usar_mensaje=True, **_):
+                          ampliar=True, creada_ts=None, usar_mensaje=True, ampliar_min_celdas=2, ampliar_min_miembros=3,
+                          ampliar_min_fraccion=1 / 3, camada_max_rareza=0.02, min_pubs_compartidas=1, **_):
     """Devuelve (grupo por cuenta: '' = genuina, detalle para el informe).
 
     `usar_mensaje=False` apaga el canal A (cuando las narrativas no son confiables, por ejemplo si el set
@@ -152,6 +153,13 @@ def detectar_coordinacion(n_cuentas, cuenta, pub, ts, narrativa, bando, ventana_
         detalle["canales"][nombre] = {"pares_candidatos": int(len(a)), "pares_fuertes": int(ok.sum())}
         for x, y, l in zip(a[ok].tolist(), b[ok].tolist(), lift[ok].tolist()):
             aristas[(x, y)] = max(aristas.get((x, y), 0.0), l)
+    if min_pubs_compartidas > 1 and aristas:
+        # Coincidir varias veces dentro de UNA publicación viral no es repetición: se pide compartir varias publicaciones.
+        A = sparse.coo_matrix((np.ones(len(cuenta), dtype=np.float32), (cuenta, pub)), shape=(n_cuentas, int(pub.max()) + 1)).tocsr()
+        A.data[:] = 1
+        pares = np.array(sorted(aristas))
+        comunes = np.asarray(A[pares[:, 0]].multiply(A[pares[:, 1]]).sum(axis=1)).ravel()
+        aristas = {tuple(p): aristas[tuple(p)] for p, k in zip(pares.tolist(), comunes) if k >= min_pubs_compartidas}
     if len(aristas) > max_aristas:  # resguardo: quedarse con los pares más fuertes
         aristas = dict(sorted(aristas.items(), key=lambda kv: (-kv[1], kv[0]))[:max_aristas])
     G = nx.Graph()
@@ -162,7 +170,9 @@ def detectar_coordinacion(n_cuentas, cuenta, pub, ts, narrativa, bando, ventana_
     detalle["cuentas_nucleo"] = int(sum(len(c) for c in componentes))
     if ampliar and componentes:
         canal = "mismo_mensaje" if usar_mensaje else "solo_tiempo"
-        componentes = _ampliar(componentes, matrices[canal], cuenta, n_cuentas, lift_min, creada_ts)
+        componentes = _ampliar(componentes, matrices[canal], cuenta, n_cuentas, lift_min, creada_ts,
+                               min_celdas=ampliar_min_celdas, min_miembros=ampliar_min_miembros,
+                               min_fraccion=ampliar_min_fraccion, max_rareza=camada_max_rareza)
     detalle["grupos_detalle"] = []
     for pos, miembros in enumerate(componentes):
         etiqueta = f"g{pos + 1:02d}"

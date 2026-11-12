@@ -80,12 +80,15 @@ def _comunidades(aristas: sparse.csr_matrix, nodos: np.ndarray, semilla: int, re
 def detectar_narrativas(textos: list, n_textos: np.ndarray, texto_id: np.ndarray, padre: np.ndarray,
                         semilla: int = 0, umbral_micro: float = 0.5, min_peso: int = 30,
                         umbral_parecido: float = 0.25, frac_acuerdo: float = 0.9, alfa_ruido: float = 0.01,
-                        resolucion: float = 1.0, min_respuestas: int = 50, umbral_sin_hilos: float = 0.1) -> Narrativas:
+                        resolucion: float = 1.0, min_respuestas: int = 50, umbral_sin_hilos: float = 0.1,
+                        tipeo_min_largo: int = 4, tipeo_razon: int = 10, factor_sin_eco: float = 0.2,
+                        largo_ruido_sin_hilos: float = 5) -> Narrativas:
+    """Los valores por defecto y su explicación están en parametros.py."""
     n = len(texto_id)
     es_resp = padre >= 0
 
     # 1. Textos únicos -> normalizados únicos -> microgrupos.
-    norm = corregir_tipeo([normalizar(t or "") for t in textos], list(n_textos))
+    norm = corregir_tipeo([normalizar(t or "") for t in textos], list(n_textos), min_largo=tipeo_min_largo, razon=tipeo_razon)
     normalizados, norm_de_texto = np.unique(np.array(norm, dtype=object).astype(str), return_inverse=True)
     peso_norm = np.bincount(norm_de_texto, weights=n_textos, minlength=len(normalizados))
     X, vec = vectorizar(normalizados.tolist())
@@ -105,7 +108,7 @@ def detectar_narrativas(textos: list, n_textos: np.ndarray, texto_id: np.ndarray
     tipo = np.full(k, CONTENIDO, dtype=np.int8)
     if hay_hilos:
         frac_resp = 1 - sueltos / np.maximum(tam, 1)
-        sin_eco = resp_recibidas <= 0.2 * tasa * sueltos
+        sin_eco = resp_recibidas <= factor_sin_eco * tasa * sueltos
         seguro = np.exp(-tasa * sueltos) < alfa_ruido
         tipo[sin_eco & (seguro | (sueltos == tam))] = RUIDO
         tipo[frac_resp >= frac_acuerdo] = ACUERDO
@@ -114,7 +117,7 @@ def detectar_narrativas(textos: list, n_textos: np.ndarray, texto_id: np.ndarray
         largo = np.array([len(t.split()) for t in normalizados])
         largo_medio = np.bincount(micro_de_norm[micro_de_norm >= 0], weights=(largo * peso_norm)[micro_de_norm >= 0],
                                   minlength=k) / np.maximum(tam, 1)
-        tipo[largo_medio < 5] = RUIDO
+        tipo[largo_medio < largo_ruido_sin_hilos] = RUIDO
 
     # 3. Comentarios con contenido propio y su "ancla" (a quién contradicen).
     propio = con_micro & (_de_micro(tipo, micro, RUIDO) == CONTENIDO)
