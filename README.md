@@ -241,7 +241,7 @@ de práctica en el código.**
 Para no engañarnos con un puntaje casi perfecto hicimos tres cosas, todas reproducibles con los scripts de
 `verificacion/` y con los resultados completos en [`PROGRESO.md`](PROGRESO.md):
 
-- **Sensibilidad:** movimos cada parámetro -50% y +50%. De 29, 23 no cambian el puntaje. Los frágiles son cuatro
+- **Sensibilidad:** movimos cada parámetro -50% y +50%. De 29, 23 lo mueven menos de 0,25 puntos. Los frágiles son cuatro
   umbrales enteros de coordinación: están en el valor mínimo que da precisión perfecta en práctica, y un paso más
   flojo trae falsos positivos. No tenemos margen de ese lado.
 - **Generalización:** corrimos el pipeline sobre recortes que no usamos para elegir nada (cada mitad de los días,

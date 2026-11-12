@@ -592,7 +592,7 @@ Corrí el pipeline completo cuatro veces seguidas en el entorno `.venv`, cada un
 
 - `comentarios.csv`, `narrativas.csv` y `cuentas.csv` son **idénticos byte a byte en las cuatro** (mismo md5) e idénticos a la salida de antes de los cambios de hoy. `costo.json` cambia, como corresponde: lleva el tiempo.
 - Puntaje de esas corridas: **54,56 / 55**.
-- **El tiempo varió 3,5 veces sin cambiar nada del código.** En las corridas 1 y 2 la máquina tenía menos de medio giga libre (Discord, Brave, el editor y un proceso de vista web ocupaban entre 200 y 470 MB cada uno) y Windows le fue sacando memoria al proceso: por eso el "pico" medido es más bajo (424 MB) y todo tarda el triple. Con 1 GB libre, 49-51 s. Ayer, con la máquina descansada, 27 s.
+- **El tiempo varió 3,5 veces sin cambiar nada del código.** En las corridas 1 y 2 la máquina tenía menos de medio giga libre (Discord, Brave, el editor y un proceso de vista web ocupaban entre 200 y 470 MB cada uno) y lo más probable es que Windows le haya ido sacando memoria al proceso: eso explicaría que el "pico" medido sea más bajo (424 MB) y que todo tarde el triple. No lo aislé con una prueba controlada. Con 1 GB libre, 49-51 s. Ayer, con la máquina descansada, 27 s.
 - Qué etapa manda: narrativas (14 s) y coordinación (16 s) en una corrida normal; ingesta 11 s; validación 5 s.
 - **Para el viernes:** cerrar todo lo que se pueda antes de correr. El resultado no cambia, pero el tiempo queda escrito en `costo.json` y es lo que mira el jurado.
 
