@@ -168,6 +168,31 @@ Por qué DuckDB y no otra cosa:
 Lo que descartamos: PostgreSQL (servidor, por filas, más lento en agregaciones), Elasticsearch (pensado para
 búsqueda, pesado para una notebook), solo dataframes en memoria (no escala y no deja nada consultable).
 
+## Escala
+
+### Medido con datos reales del set de práctica
+
+El comando normal, de punta a punta (con validación y reporte), sobre muestras de publicaciones completas con
+todos sus hilos de respuestas; la última fila es el set entero. Tres corridas por tamaño.
+
+| Comentarios | Publicaciones | Cuentas | Tiempo (mediana; rango) | Comentarios por segundo | Memoria pico | Etapa más lenta | Base DuckDB | Puntaje /55 |
+|---|---|---|---|---|---|---|---|---|
+| 10.657 | 38 | 5.634 | 3,7 s (3,3 a 4,0) | 2.880 | 204 MB | ingesta (1,5 s) | 3,0 MB | 27,24 |
+| 50.190 | 160 | 12.581 | 9,5 s (9,5 a 9,8) | 5.283 | 302 MB | ingesta (2,9 s) | 12,8 MB | 33,47 |
+| 100.287 | 274 | 15.013 | 17,9 s (17,9 a 18,4) | 5.602 | 431 MB | coordinación (5,4 s) | 20,8 MB | 53,84 |
+| 200.000 | 506 | 15.991 | 31,1 s (30,5 a 31,2) | 6.430 | 634 MB | coordinación (10,9 s) | 35,3 MB | 54,56 |
+
+Qué se ve:
+
+- **El tiempo crece en línea con los datos, no más rápido:** de 50.000 a 200.000 hay 4 veces más comentarios y 3,3 veces más tiempo.
+- **La memoria también:** unos 190 MB fijos más unos 2,3 MB por cada mil comentarios.
+- **La base ocupa unos 0,18 MB por cada mil comentarios.**
+- **El puntaje baja en las muestras chicas por la coordinación, no por el texto.** Con 10.000 y 50.000 comentarios las narrativas se agrupan igual de bien (0,97 y 1,00), pero las cuentas coordinadas casi no llegan a repetir coincidencias y el pipeline prefiere no marcarlas (0 y 10 marcadas, sin falsos positivos). Detectar coordinación necesita volumen.
+
+Condiciones de la medición (jueves 12/11, 19:00): notebook i7-10510U con 8 GB de RAM, con el editor, un navegador
+y un chat abiertos; entre 0,6 y 1,6 GB de RAM libre al empezar cada corrida. Se repite con
+`python verificacion/escala.py`.
+
 ## Cómo escalaría a millones de comentarios por día
 
 Hoy: 200.000 comentarios en 27 a 48 s en una notebook (entre 4.000 y 7.000 comentarios por segundo, de punta a punta).
@@ -271,7 +296,7 @@ Para no engañarnos con un puntaje casi perfecto hicimos tres cosas, todas repro
 ```
 pipeline/        nuestro código (un módulo por etapa; entrada: python -m pipeline.run)
 pruebas/         pruebas mínimas (formato, datos sucios, reproducibilidad)
-verificacion/    sensibilidad, generalización y ejemplos (usan la verdad de práctica; no son parte del pipeline)
+verificacion/    sensibilidad, generalización, escala y ejemplos (usan la verdad de práctica; no son parte del pipeline)
 entrega/         resultado del set final (se genera el viernes 13)
 reporte/         reporte visual en HTML de cada corrida
 evaluacion/      evaluador oficial (de la organización)

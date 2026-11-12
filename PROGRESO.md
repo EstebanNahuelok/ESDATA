@@ -767,3 +767,44 @@ Además: si la corrida tuvo alertas (set sin respuestas, tope de seguridad), el 
   - **Cierre: viernes 13 a las 13:00.** Hay que tener pusheados `entrega/` y el código que la generó.
   - Regla nueva: no se puede editar a mano la entrega, y **a los equipos del podio el jurado les vuelve a correr el comando sobre el set final; si el resultado no se parece al entregado, quedan afuera**. Piden semillas fijas; si se usa IA, aceptan diferencias menores.
   - Nuestro `DESAFIO.md` es la versión anterior del enunciado: todavía no trae estos cambios.
+
+
+---
+
+# Jueves 12, 18:55: ensayo desde cero, como lo haría el jurado
+
+Cloné https://github.com/EstebanNahuelok/ESDATA.git (rama por defecto, `main`, commit `f38bad2`) en una carpeta nueva y seguí el README al pie de la letra.
+
+| Paso | Resultado |
+|---|---|
+| `git clone` | Baja `main` con todo: `pipeline/`, `pruebas/`, `verificacion/`, datos de práctica, README, LICENSE. |
+| `python -m venv .venv` + `pip install -r requirements.txt` | Sin errores. Python 3.13.3; duckdb 1.5.6, numpy 2.5.4, pandas 3.1.1, scipy 1.18.1, scikit-learn 1.9.1, networkx 3.7, psutil 7.2.2. |
+| `python -m pipeline.run --datos datos/practica --entrega salida/practica` | 38,2 s, pico 591 MB. "Validación: OK", controles de cordura sin alertas, 13 narrativas, 115 cuentas en grupos de 60, 30 y 25. |
+| `python evaluacion/puntuar.py ...` | **54,56 / 55**. |
+| Comparación con la carpeta de trabajo | `comentarios.csv`, `narrativas.csv` y `cuentas.csv` idénticos byte a byte. |
+| `python -m unittest discover -s pruebas` | 24 pruebas, OK, 39 s. |
+
+Nada falló. Dos detalles menores:
+
+- Correr sobre práctica vuelve a escribir `reporte/practica.html`, que está versionado: cambian el tiempo, la memoria y la fecha de generación, así que el clon queda con ese archivo modificado. No afecta a la entrega.
+- El evaluador de la organización muestra mal las tildes en la consola de Windows ("Detecci�n"). Es de su script, no del nuestro; el puntaje se lee bien.
+
+La carpeta del ensayo quedó en `C:\PROYECTOS\ensayo-esdata` (fuera del repo); se puede borrar.
+
+
+---
+
+# Jueves 12, 19:05: tabla de escala con datos reales
+
+Script nuevo: `verificacion/escala.py`. Arma muestras anidadas de publicaciones completas (con sus hilos) y corre el comando normal, con validación y reporte, tres veces por tamaño.
+
+| Comentarios | Publicaciones | Cuentas | Tiempo (mediana; rango) | Comentarios por segundo | Memoria pico | Etapa más lenta | Base DuckDB | Puntaje /55 |
+|---|---|---|---|---|---|---|---|---|
+| 10.657 | 38 | 5.634 | 3,7 s (3,3 a 4,0) | 2.880 | 204 MB | ingesta (1,5 s) | 3,0 MB | 27,24 |
+| 50.190 | 160 | 12.581 | 9,5 s (9,5 a 9,8) | 5.283 | 302 MB | ingesta (2,9 s) | 12,8 MB | 33,47 |
+| 100.287 | 274 | 15.013 | 17,9 s (17,9 a 18,4) | 5.602 | 431 MB | coordinación (5,4 s) | 20,8 MB | 53,84 |
+| 200.000 | 506 | 15.991 | 31,1 s (30,5 a 31,2) | 6.430 | 634 MB | coordinación (10,9 s) | 35,3 MB | 54,56 |
+
+- Tiempo y memoria crecen en línea con los datos: unos 190 MB fijos más unos 2,3 MB por cada mil comentarios. Proyectado a un millón (sin medir): unos 2,5 GB.
+- El puntaje de las muestras chicas baja por coordinación: con 10.657 comentarios marca 0 de 39 cuentas; con 50.190, 10 de 95; con 100.287, 108 de 113. Siempre sin falsos positivos. Las narrativas se agrupan bien en todos los tamaños (0,970 / 0,998 / 1,000 / 1,000).
+- **No se midió "con todo lo demás cerrado".** Estaban abiertos el editor, un navegador (Brave), Discord y el agente; había entre 0,6 y 1,6 GB de RAM libre al empezar cada corrida. Las tres repeticiones dieron casi lo mismo (diferencias de menos de 1 s), así que el número parece estable, pero con la máquina libre puede ser algo mejor. Para repetirlo: `python verificacion/escala.py`.
