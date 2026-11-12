@@ -14,13 +14,14 @@ from .texto import PALABRAS_VACIAS
 
 def vectorizar(textos: list):
     """TF-IDF de palabras y pares de palabras, filas con norma 1. Devuelve (matriz dispersa, vectorizador)."""
-    vec = TfidfVectorizer(ngram_range=(1, 2), min_df=2, sublinear_tf=True, stop_words=sorted(PALABRAS_VACIAS),
-                          token_pattern=r"(?u)\b\w+\b", dtype=np.float32)
-    try:
-        X = vec.fit_transform(textos)
-    except ValueError:  # vocabulario vacío (set mínimo o sin texto)
-        return sparse.csr_matrix((len(textos), 1), dtype=np.float32), None
-    return X.tocsr(), vec
+    for min_df in (2, 1):  # con muy pocos textos distintos ningún término se repite: se acepta min_df=1
+        vec = TfidfVectorizer(ngram_range=(1, 2), min_df=min_df, sublinear_tf=True, stop_words=sorted(PALABRAS_VACIAS),
+                              token_pattern=r"(?u)\b\w+\b", dtype=np.float32)
+        try:
+            return vec.fit_transform(textos).tocsr(), vec
+        except ValueError:  # vocabulario vacío (set mínimo o sin texto)
+            continue
+    return sparse.csr_matrix((len(textos), 1), dtype=np.float32), None
 
 
 def _centroides(X, etiquetas, pesos, k):

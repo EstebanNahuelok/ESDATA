@@ -54,6 +54,13 @@ def _resolver_hilos(valor: np.ndarray, padre: np.ndarray, pendiente: np.ndarray,
     return valor
 
 
+def _de_micro(valores: np.ndarray, micro: np.ndarray, vacio) -> np.ndarray:
+    """valores[micro] tolerando micro = -1 (el llamador lo descarta) y el caso sin ningún microgrupo."""
+    if len(valores) == 0:
+        return np.full(len(micro), vacio)
+    return valores[np.maximum(micro, 0)]
+
+
 def _comunidades(aristas: sparse.csr_matrix, nodos: np.ndarray, semilla: int, resolucion: float) -> np.ndarray:
     """Louvain sobre el grafo de microgrupos. Devuelve la comunidad de cada microgrupo (-1 = fuera del grafo)."""
     com = -np.ones(aristas.shape[0], dtype=np.int64)
@@ -110,7 +117,7 @@ def detectar_narrativas(textos: list, n_textos: np.ndarray, texto_id: np.ndarray
         tipo[largo_medio < 5] = RUIDO
 
     # 3. Comentarios con contenido propio y su "ancla" (a quién contradicen).
-    propio = con_micro & (tipo[np.maximum(micro, 0)] == CONTENIDO)
+    propio = con_micro & (_de_micro(tipo, micro, RUIDO) == CONTENIDO)
     #    El ancla de un comentario con contenido es él mismo; lo que contradice es el ancla de su padre.
     ancla = _resolver_hilos(np.where(propio, np.arange(n), -1), padre, es_resp & ~propio)
     objetivo = np.where(es_resp & propio, ancla[np.maximum(padre, 0)], -1)
@@ -142,10 +149,10 @@ def detectar_narrativas(textos: list, n_textos: np.ndarray, texto_id: np.ndarray
         tipo[sin_narrativa[resp_recibidas[sin_narrativa] == 0]] = RUIDO
     huerfanos = np.flatnonzero((tipo == CONTENIDO) & (comunidad < 0))
     comunidad[huerfanos] = (comunidad.max() if k else -1) + 1 + np.arange(len(huerfanos))
-    propio = con_micro & (tipo[np.maximum(micro, 0)] == CONTENIDO)
+    propio = con_micro & (_de_micro(tipo, micro, RUIDO) == CONTENIDO)
 
     # 5. Narrativa por comentario: los sueltos toman la de su microgrupo; las respuestas heredan del padre.
-    propia = np.where(propio, comunidad[np.maximum(micro, 0)], -1)
+    propia = np.where(propio, _de_micro(comunidad, micro, -1), -1)
     narrativa = _resolver_hilos(np.where(es_resp, -1, propia), padre, es_resp)
     sin_heredar = es_resp & (narrativa < 0)
     narrativa[sin_heredar] = propia[sin_heredar]

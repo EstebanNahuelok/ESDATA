@@ -88,7 +88,7 @@ def correr(datos: Path, entrega: Path, base: Path, semilla: int = 0) -> dict:
     nar = reloj.etapa("narrativas", detectar_narrativas, textos, n_textos, texto_id, padre, semilla=semilla)
     print(f"  {json.dumps(nar.info, ensure_ascii=False)}", flush=True)
 
-    avisos = []
+    avisos = list(resumen["avisos"])
     n_cuentas = len(cuentas["seguidores"])
     n_com = int(nar.comunidad.max()) + 1 if len(nar.comunidad) else 0
     cuenta = com["cuenta"].astype(np.int64)
@@ -131,7 +131,13 @@ def correr(datos: Path, entrega: Path, base: Path, semilla: int = 0) -> dict:
                                    ts, resumen["zona_seg"])
     for f in filas:
         print(f"  {f['narrativa']} {f['comentarios']:>6} {f['fecha_origen']}  {f['titulo'][:70]}", flush=True)
-    print(f"  indicios de postura por narrativa: {json.dumps(dict(zip(etiquetas.tolist(), (detalle_postura.get(c, {}) for c in range(n_com)))), ensure_ascii=False)}", flush=True)
+    sin_fecha = sum(f["sin_fecha"] for f in filas)
+    if sin_fecha:
+        avisos.append(f"{sin_fecha} narrativas sin ninguna fecha válida: su fecha_origen es la primera fecha del set")
+    if resumen["comentarios_sin_fecha"]:
+        avisos.append(f"{resumen['comentarios_sin_fecha']} comentarios sin fecha válida (no se usan para origen ni coordinación)")
+    if resumen["comentarios_descartados"]:
+        avisos.append(f"{resumen['comentarios_descartados']} filas de comentarios descartadas (id vacío o repetido)")
     reloj.etapa("escritura", escribir_entrega, con, entrega, etiquetas, nar.narrativa, postura, filas, grupo_cuenta)
     con.close()
 

@@ -27,6 +27,8 @@ def describir_narrativas(nar: Narrativas, bando: np.ndarray, signo: np.ndarray, 
     normas = np.linalg.norm(perfiles, axis=1, keepdims=True)
     perfiles = perfiles / np.where(normas > 0, normas, 1)
     media = perfiles[orden].mean(axis=0) if orden else 0
+    con_fecha = ts[~np.isnan(ts)]
+    respaldo = int(con_fecha.min()) if len(con_fecha) else 0
     filas = []
     for pos, c in enumerate(orden):
         etiquetas[c] = f"n{pos + 1:02d}"
@@ -47,9 +49,11 @@ def describir_narrativas(nar: Narrativas, bando: np.ndarray, signo: np.ndarray, 
             if len(frases) == n_frases:
                 break
         origen = fecha_origen(ts[(nar.narrativa == c) & ~np.isnan(ts)])
-        filas.append({"narrativa": etiquetas[c], "titulo": titulo, "frases_clave": "|".join(frases),
-                      "fecha_origen": a_iso(origen, zona_seg) if origen is not None else "",
-                      "comentarios": int(tam_com[c])})
+        # Sin ninguna fecha válida en la narrativa se usa la primera fecha del set (el formato exige una fecha).
+        filas.append({"narrativa": etiquetas[c], "titulo": titulo or etiquetas[c],
+                      "frases_clave": "|".join(frases) or etiquetas[c],
+                      "fecha_origen": a_iso(origen if origen is not None else respaldo, zona_seg),
+                      "comentarios": int(tam_com[c]), "sin_fecha": origen is None})
     return etiquetas, filas
 
 
@@ -76,7 +80,7 @@ def escribir_entrega(con, entrega: Path, etiqueta_com: np.ndarray, narrativa: np
                 FROM comentarios c JOIN res_comentarios r USING (i) ORDER BY c.comentario_id""", "comentarios.csv")
     exportar("SELECT narrativa, titulo, frases_clave, fecha_origen FROM res_narrativas ORDER BY narrativa", "narrativas.csv")
     exportar("""SELECT c.cuenta_id, nullif(r.grupo, '') AS grupo
-                FROM cuentas c JOIN res_cuentas r USING (cuenta) ORDER BY c.cuenta_id""", "cuentas.csv")
+                FROM cuentas c JOIN res_cuentas r USING (cuenta) WHERE c.cuenta_id <> '' ORDER BY c.cuenta_id""", "cuentas.csv")
 
 
 def escribir_costo(entrega: Path, costo: dict) -> None:

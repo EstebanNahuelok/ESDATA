@@ -69,11 +69,25 @@ y `costo.json`, con el formato del enunciado.
 Opciones: `--base ruta.duckdb` (dónde guardar la base; por defecto `almacen/<nombre de la carpeta de datos>.duckdb`)
 y `--semilla N` (por defecto 0). Con la misma semilla, dos corridas dan archivos idénticos byte a byte.
 
-Pruebas automáticas (20 segundos):
+Pruebas automáticas (25 segundos):
 
 ```bash
 python -m unittest discover -s pruebas
 ```
+
+`requirements.txt` trae rangos de versiones. Lo probamos desde cero en un entorno virtual nuevo con las versiones
+más recientes (las exactas están en `requirements-lock.txt`) y también con versiones de 2025
+(pandas 2.2, numpy 2.2, scikit-learn 1.6, networkx 3.4): los archivos de salida son idénticos byte a byte.
+Para reproducir exactamente nuestro entorno: `pip install -r requirements-lock.txt`.
+
+### Datos sucios o incompletos
+
+El pipeline no se corta con: archivos opcionales faltantes (`cuentas`, `publicaciones`, `fuentes`), columnas
+faltantes, ids duplicados o vacíos, fechas imposibles, números inválidos, textos vacíos, respuestas a comentarios
+que no existen, hilos circulares, comentarios sin cuenta, archivos con BOM, separador `;` o codificación
+Windows-1252, ni con un set vacío o de un solo comentario. Cada caso tiene su prueba en `pruebas/`, y lo que se
+tuvo que descartar o suponer queda anotado en el campo `notas` de `costo.json`. Solo `comentarios.csv(.gz)` es
+obligatorio: si falta, el pipeline termina con un mensaje claro.
 
 ## Cómo funciona
 

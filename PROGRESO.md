@@ -119,3 +119,16 @@ Sin IA ni APIs. El núcleo no cambió; el puntaje de práctica se vuelve a medir
 - Contiene: resultado en práctica, cómo correr con un comando, cómo funciona cada etapa, por qué DuckDB, cómo escalaría a millones por día, qué código existía antes (evaluador y línea base de la organización, y qué dos ideas chicas tomamos de la línea base), y tres tablas que separan reglas generales, supuestos vistos en práctica y parámetros elegidos midiendo en práctica (con su sensibilidad).
 - Para revisar por el equipo: el README dice que el código se escribió con ayuda de un asistente de programación con IA. Si prefieren otra redacción, es una línea en la sección "Qué existía antes del evento".
 - Pendiente declarado en el propio README: no hay una corrida medida con millones de comentarios; la parte de escala es diseño.
+
+## Punto 2 — Robustez e instalación desde cero (jueves 12, 13:50) ✅
+
+- **Entorno virtual nuevo** en `.venv/` (ignorado por git; quedó creado y se puede seguir usando): `python -m venv .venv`, `pip install -r requirements.txt`, correr, medir y pruebas. Todo anduvo a la primera.
+- `requirements.txt` ya tenía todo (`duckdb` incluido). El entorno nuevo instaló versiones más nuevas que las del Python global (pandas 3.1, numpy 2.5, scikit-learn 1.9, networkx 3.7, scipy 1.18) y la salida es **idéntica byte a byte** a la del Python global (pandas 2.2, numpy 2.2, scikit-learn 1.6). Versiones exactas en `requirements-lock.txt` (nuevo).
+- Práctica en el entorno nuevo: **54,56 / 55**, sin cambios. Primera corrida en frío 47 s; las siguientes 27-30 s.
+- Pruebas nuevas de datos sucios (ahora son 12 pruebas, 25 s). Encontraron **tres errores reales**, ya corregidos:
+  1. Con muy pocos textos distintos (un solo comentario, o muchos comentarios idénticos) el pipeline se caía por vocabulario vacío.
+  2. Un comentario sin `cuenta_id` generaba una fila con cuenta vacía en `cuentas.csv`.
+  3. Si ninguna fecha era válida, `fecha_origen` salía vacía (formato inválido). Ahora usa la primera fecha del set y lo avisa en `costo.json`.
+- Además: un archivo que no está en UTF-8 se lee como Windows-1252 (antes se perdían las tildes), se aceptan BOM y separador `;`, y la zona horaria del set ya no se confunde cuando muchas fechas vienen rotas.
+- Los avisos de la ingesta (archivos o columnas que faltan, filas descartadas, comentarios sin fecha) quedan en `notas` de `costo.json`.
+- No probado: Python anterior a 3.13 (es el único instalado en la máquina) ni Linux/Mac.

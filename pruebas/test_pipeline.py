@@ -86,6 +86,42 @@ class DatosChicosTest(Base):
         escribir(self.datos / "comentarios.csv", COLUMNAS, filas)
         self.revisar_formato(self.correr(), {"c1", "c2", "c3", "c4"}, {"u1", "u2", "u3"})
 
+    def test_un_solo_comentario(self):
+        escribir(self.datos / "comentarios.csv", COLUMNAS, [["c1", "p1", "u1", "2026-09-01T10:00:00-03:00", "Hola", "", "0"]])
+        self.revisar_formato(self.correr(), {"c1"}, {"u1"})
+
+    def test_faltan_columnas(self):
+        escribir(self.datos / "comentarios.csv", ["comentario_id", "texto"],
+                 [[f"c{i}", "La obra está parada hace meses y nadie explica nada"] for i in range(40)])
+        self.revisar_formato(self.correr(), {f"c{i}" for i in range(40)}, set())
+
+    def test_sin_ninguna_fecha_valida(self):
+        filas = [[f"c{i}", "p1", f"u{i % 7}", "ayer", "La obra está parada hace meses y nadie explica nada", "", "0"] for i in range(60)]
+        filas += [[f"r{i}", "p1", f"u{i % 5}", "", "Mentira, la obra avanza y ya retomaron los trabajos", f"c{i}", "x"] for i in range(60)]
+        escribir(self.datos / "comentarios.csv", COLUMNAS, filas)
+        self.revisar_formato(self.correr(), {f[0] for f in filas}, {f"u{i}" for i in range(7)})
+
+    def test_hilos_raros_y_cuentas_vacias(self):
+        filas = [["c1", "p1", "u1", "2026-09-01T10:00:00-03:00", "La obra está parada", "c2", "1"],   # ciclo c1 <-> c2
+                 ["c2", "p1", "u2", "2026-09-01T10:01:00-03:00", "Mentira, la obra avanza", "c1", "1"],
+                 ["c3", "p1", "u3", "2026-09-01T10:02:00-03:00", "Tal cual", "c3", "1"],              # se responde a sí mismo
+                 ["c4", "p1", "", "2026-09-01T10:03:00-03:00", "Comentario sin cuenta", "c_no_existe", "-5"],
+                 ["c5", "", "u1", "2026-09-01T10:04:00-03:00", 'Texto con "comillas", comas\ny salto de línea', "", ""]]
+        escribir(self.datos / "comentarios.csv", COLUMNAS, filas)
+        escribir(self.datos / "cuentas.csv", ["cuenta_id", "usuario", "fecha_creacion", "seguidores", "siguiendo"],
+                 [["u1", "a", "2020-01-01", "10", "5"], ["u1", "a", "2020-01-01", "10", "5"], ["u9", "b", "no sé", "muchos", ""]])
+        self.revisar_formato(self.correr(), {"c1", "c2", "c3", "c4", "c5"}, {"u1", "u2", "u3", "u9"})
+
+    def test_bom_punto_y_coma_y_latin1(self):
+        filas = [[f"c{i}", "p1", f"u{i % 9}", "2026-09-01T10:00:00-03:00", "La obra está parada hace más de un año", "", "0"] for i in range(30)]
+        texto = "\n".join(";".join(f) for f in [COLUMNAS, *filas]) + "\n"
+        for nombre, contenido in (("con_bom", "\ufeff".encode("utf-8") + texto.encode("utf-8")),
+                                  ("latin1", texto.encode("latin-1"))):
+            (self.datos / "comentarios.csv").write_bytes(contenido)
+            entrega = self.correr(self.tmp / nombre)
+            self.revisar_formato(entrega, {f[0] for f in filas}, {f"u{i}" for i in range(9)})
+            self.assertIn("más de un año", (entrega / "narrativas.csv").read_text(encoding="utf-8"), nombre)
+
     def test_sin_comentarios(self):
         escribir(self.datos / "comentarios.csv.gz", COLUMNAS, [])
         self.revisar_formato(self.correr(), set(), set())

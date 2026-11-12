@@ -10,6 +10,8 @@ tablas tipadas con índices enteros, que es lo que usa el resto del pipeline:
 
 `ts` es el instante en segundos UTC; `hora_local` es la hora de reloj tal como viene escrita.
 """
+import gzip
+import shutil
 from pathlib import Path
 
 import duckdb
@@ -31,21 +33,47 @@ def _buscar(datos: Path, nombre: str):
     return None
 
 
-def _cargar_crudo(con, datos: Path, nombre: str, columnas: list, obligatoria: bool):
+def _asegurar_utf8(ruta: Path, carpeta: Path):
+    """Si el archivo no está en UTF-8, deja una copia convertida desde Windows-1252. Devuelve (ruta a leer, convertido)."""
+    abrir = gzip.open if ruta.suffix == ".gz" else open
+    try:
+        with abrir(ruta, "rt", encoding="utf-8", newline="") as f:
+            while f.read(1 << 20):
+                pass
+        return ruta, False
+    except UnicodeDecodeError:
+        destino = carpeta / f"_utf8_{ruta.name[:-3] if ruta.suffix == '.gz' else ruta.name}"
+        with abrir(ruta, "rt", encoding="cp1252", errors="replace", newline="") as f:
+            with open(destino, "w", encoding="utf-8", newline="") as g:
+                shutil.copyfileobj(f, g)
+        return destino, True
+
+
+def _cargar_crudo(con, datos: Path, nombre: str, columnas: list, obligatoria: bool, carpeta_tmp: Path, avisos: list):
     """Carga un CSV como texto en `crudo_<nombre>`; las columnas que falten quedan en NULL."""
     ruta = _buscar(datos, nombre)
     if ruta is None:
         if obligatoria:
             raise FileNotFoundError(f"Falta {nombre}.csv(.gz) en {datos}")
+        avisos.append(f"no vino {nombre}.csv: se sigue sin ese archivo")
         con.execute(f"CREATE OR REPLACE TABLE crudo_{nombre} AS SELECT "
                     + ", ".join(f"NULL::VARCHAR AS {c}" for c in columnas) + " WHERE false")
         return 0
+    ruta, convertido = _asegurar_utf8(ruta, carpeta_tmp)
+    if convertido:
+        avisos.append(f"{nombre}.csv no estaba en UTF-8: se leyó como Windows-1252")
     ruta_sql = str(ruta).replace("'", "''")
     con.execute(f"""CREATE OR REPLACE TEMP VIEW _lectura AS SELECT * FROM read_csv('{ruta_sql}', all_varchar=true,
                     header=true, ignore_errors=true, null_padding=true, strict_mode=false)""")
     presentes = {r[0] for r in con.execute("DESCRIBE _lectura").fetchall()}
+    faltan = [c for c in columnas if c not in presentes]
+    if faltan:
+        avisos.append(f"{nombre}.csv vino sin las columnas {', '.join(faltan)}")
     seleccion = ", ".join(f"trim({c}) AS {c}" if c in presentes else f"NULL::VARCHAR AS {c}" for c in columnas)
     con.execute(f"CREATE OR REPLACE TABLE crudo_{nombre} AS SELECT {seleccion} FROM _lectura")
+    con.execute("DROP VIEW _lectura")
+    if convertido:
+        ruta.unlink()
     return con.execute(f"SELECT count(*) FROM crudo_{nombre}").fetchone()[0]
 
 
@@ -71,11 +99,12 @@ def ingerir(datos: Path, base: Path, memoria: str = "2GB", hilos: int = 4) -> tu
     con.execute(f"SET memory_limit='{memoria}'")
     con.execute(f"SET threads={hilos}")
     con.execute("SET enable_progress_bar=false")
-    crudos = {n: _cargar_crudo(con, datos, n, cols, obligatoria=(n == "comentarios")) for n, cols in TABLAS.items()}
+    avisos = []
+    crudos = {n: _cargar_crudo(con, datos, n, cols, n == "comentarios", base.parent, avisos) for n, cols in TABLAS.items()}
 
     # Zona horaria dominante del set (para escribir fecha_origen y para fechas que vengan sin zona).
     fila = con.execute("""SELECT regexp_extract(fecha, '([+-][0-9]{2}:[0-9]{2})$', 1) z, count(*) n
-                          FROM crudo_comentarios GROUP BY 1 ORDER BY n DESC, z LIMIT 1""").fetchone()
+                          FROM crudo_comentarios GROUP BY 1 HAVING z <> '' ORDER BY n DESC, z LIMIT 1""").fetchone()
     zona = fila[0] if fila and fila[0] else ZONA_POR_DEFECTO
     zona_seg = (-1 if zona[0] == "-" else 1) * (int(zona[1:3]) * 3600 + int(zona[4:6]) * 60)
 
@@ -126,6 +155,7 @@ def ingerir(datos: Path, base: Path, memoria: str = "2GB", hilos: int = 4) -> tu
     n_com, n_sin_fecha, n_resp = con.execute(
         "SELECT count(*), count(*) FILTER (ts IS NULL), count(*) FILTER (padre >= 0) FROM comentarios").fetchone()
     resumen = {
+        "avisos": avisos,
         "zona": zona,
         "zona_seg": zona_seg,
         "filas_crudas": crudos,
