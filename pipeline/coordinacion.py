@@ -30,14 +30,17 @@ def _incidencias(cuenta, claves, n_cuentas):
     return M, (M @ sparse.diags(1 / np.sqrt(tam[tam > 1]))).tocsr()
 
 
-def pares_sincronizados(cuenta, claves_extra, ts, n_cuentas, ventana_s=1800, min_veces=2, bloque=4000):
+def _matrices(cuenta, claves_extra, ts, n_cuentas, ventana_s):
+    """Las ventanas se calculan dos veces, corridas media ventana, para no partir una ráfaga al medio."""
+    return [_incidencias(cuenta, [*claves_extra, (ts + corrimiento) // ventana_s], n_cuentas)
+            for corrimiento in (0, ventana_s // 2)]
+
+
+def pares_sincronizados(matrices, cuenta, n_cuentas, min_veces=2, bloque=4000):
     """Pares (a < b) que coinciden en `min_veces`+ celdas. Devuelve a, b, suma pesada, veces, lift.
 
-    Las ventanas se calculan dos veces, corridas media ventana, para no partir una ráfaga al medio.
     El producto de matrices se hace por bloques de cuentas para no llenar la memoria.
     """
-    matrices = [_incidencias(cuenta, [*claves_extra, (ts + corrimiento) // ventana_s], n_cuentas)
-                for corrimiento in (0, ventana_s // 2)]
     total = len(cuenta)
     actividad = np.bincount(cuenta, minlength=n_cuentas).astype(np.float64)
     partes = []
@@ -64,8 +67,66 @@ def pares_sincronizados(cuenta, claves_extra, ts, n_cuentas, ventana_s=1800, min
     return a, b, s, veces, lift
 
 
+def _camada(creada_ts, miembros, max_rareza=0.02, min_validos=5):
+    """Si las cuentas del grupo fueron creadas casi todas juntas, devuelve qué cuentas del set caen en esa
+    misma franja de fechas. La franja sale del propio grupo (no hay umbral de antigüedad fijo) y solo
+    cuenta como indicio si es rara en el set (menos de `max_rareza` de todas las cuentas)."""
+    if creada_ts is None:
+        return None
+    fechas = creada_ts[miembros]
+    fechas = fechas[~np.isnan(fechas)]
+    if len(fechas) < min_validos:
+        return None
+    p10, p90 = np.percentile(fechas, [10, 90])
+    margen = max(p90 - p10, 86400.0)
+    en_franja = (creada_ts >= p10 - margen) & (creada_ts <= p90 + margen)
+    return en_franja if en_franja.mean() <= max_rareza else None
+
+
+def _ampliar(grupos, matrices, cuenta, n_cuentas, lift_min, creada_ts=None, min_celdas=2, min_miembros=3, rondas=3):
+    """Suma a cada grupo las cuentas que coinciden con el grupo como conjunto.
+
+    Una cuenta con poca actividad puede no llegar a repetir con ningún par en particular, pero sí aparecer
+    en celdas dominadas por el mismo grupo. Se acepta si eso pasa 2+ veces, o 1 vez cuando además la cuenta
+    fue creada en la misma franja de fechas que el grupo (camada). Siempre con lift alto contra el azar.
+    """
+    total = len(cuenta)
+    actividad = np.maximum(np.bincount(cuenta, minlength=n_cuentas), 1).astype(np.float64)
+    grupo_de = -np.ones(n_cuentas, dtype=np.int64)
+    for g, miembros in enumerate(grupos):
+        grupo_de[miembros] = g
+    for _ in range(rondas):
+        mejor_lift = np.zeros(n_cuentas)
+        mejor_grupo = -np.ones(n_cuentas, dtype=np.int64)
+        for g in range(len(grupos)):
+            es_miembro = (grupo_de == g).astype(np.float32)
+            camada = _camada(creada_ts, np.flatnonzero(grupo_de == g))
+            for M, _Mp in matrices:
+                if M.shape[1] == 0:
+                    continue
+                en_celda = M.T @ es_miembro
+                tam = np.asarray(M.sum(axis=0)).ravel()
+                dominada = en_celda >= min_miembros
+                if not dominada.any():
+                    continue
+                veces = M @ dominada.astype(np.float32)
+                suma = M @ np.where(dominada, en_celda / tam, 0).astype(np.float32)
+                lift = suma * total / (actividad * en_celda[dominada].sum())
+                repite = veces >= min_celdas
+                if camada is not None:
+                    repite |= (veces >= 1) & camada
+                cand = repite & (lift >= lift_min) & (lift > mejor_lift) & (grupo_de < 0)
+                mejor_lift[cand], mejor_grupo[cand] = lift[cand], g
+        nuevos = np.flatnonzero(mejor_grupo >= 0)
+        if len(nuevos) == 0:
+            break
+        grupo_de[nuevos] = mejor_grupo[nuevos]
+    return [np.flatnonzero(grupo_de == g).tolist() for g in range(len(grupos))]
+
+
 def detectar_coordinacion(n_cuentas, cuenta, pub, ts, narrativa, bando, ventana_s=1800, lift_min=40.0,
-                          veces_con_texto=2, veces_sin_texto=3, k_truss=4, min_grupo=5, max_aristas=200000, **_):
+                          veces_con_texto=2, veces_sin_texto=3, k_truss=4, min_grupo=5, max_aristas=200000,
+                          ampliar=True, creada_ts=None, **_):
     """Devuelve (grupo por cuenta: '' = genuina, detalle para el informe)."""
     grupo = np.full(n_cuentas, "", dtype=object)
     validos = ~np.isnan(ts)
@@ -77,8 +138,9 @@ def detectar_coordinacion(n_cuentas, cuenta, pub, ts, narrativa, bando, ventana_
                "solo_tiempo": ([pub], veces_sin_texto)}
     aristas = {}
     detalle = {"canales": {}}
-    for nombre, (claves, veces_min) in canales.items():
-        a, b, _s, veces, lift = pares_sincronizados(cuenta, claves, ts, n_cuentas, ventana_s, min_veces=veces_min)
+    matrices = {nombre: _matrices(cuenta, claves, ts, n_cuentas, ventana_s) for nombre, (claves, _v) in canales.items()}
+    for nombre, (_claves, veces_min) in canales.items():
+        a, b, _s, veces, lift = pares_sincronizados(matrices[nombre], cuenta, n_cuentas, min_veces=veces_min)
         ok = lift >= lift_min
         detalle["canales"][nombre] = {"pares_candidatos": int(len(a)), "pares_fuertes": int(ok.sum())}
         for x, y, l in zip(a[ok].tolist(), b[ok].tolist(), lift[ok].tolist()):
@@ -90,6 +152,9 @@ def detectar_coordinacion(n_cuentas, cuenta, pub, ts, narrativa, bando, ventana_
     G = nx.k_truss(nx.k_core(G, k_truss - 1), k_truss) if G.number_of_edges() else G
     componentes = sorted((sorted(c) for c in nx.connected_components(G) if len(c) >= min_grupo),
                          key=lambda c: (-len(c), c[0]))
+    detalle["cuentas_nucleo"] = int(sum(len(c) for c in componentes))
+    if ampliar and componentes:
+        componentes = _ampliar(componentes, matrices["mismo_mensaje"], cuenta, n_cuentas, lift_min, creada_ts)
     detalle["grupos_detalle"] = []
     for pos, miembros in enumerate(componentes):
         etiqueta = f"g{pos + 1:02d}"

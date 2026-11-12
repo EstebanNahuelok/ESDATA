@@ -59,6 +59,13 @@ class Reloj:
         return resultado
 
 
+def _a_float(columna) -> np.ndarray:
+    """Columna numérica de DuckDB a float, con NaN donde había NULL."""
+    if np.ma.isMaskedArray(columna):
+        return np.ma.filled(columna.astype(np.float64), np.nan)
+    return np.asarray(columna, dtype=np.float64)
+
+
 def _hardware() -> str:
     ram = f"{round(psutil.virtual_memory().total / 2**30)} GB RAM" if psutil else "RAM sin medir"
     return f"{platform.system()} {platform.machine()}, {os.cpu_count()} hilos de CPU, {ram}, no usa GPU"
@@ -73,7 +80,7 @@ def correr(datos: Path, entrega: Path, base: Path, semilla: int = 0) -> dict:
 
     com = con.execute("SELECT texto_id, padre, pub, cuenta, ts, hora_local, me_gusta FROM comentarios ORDER BY i").fetchnumpy()
     texto_id, padre = com["texto_id"].astype(np.int64), com["padre"].astype(np.int64)
-    ts = np.ma.filled(com["ts"].astype(np.float64), np.nan) if np.ma.isMaskedArray(com["ts"]) else com["ts"].astype(np.float64)
+    ts = _a_float(com["ts"])
     tx = con.execute("SELECT texto, n FROM textos ORDER BY texto_id").fetchnumpy()
     textos, n_textos = list(tx["texto"]), tx["n"].astype(np.int64)
     cuentas = con.execute("SELECT creada_ts, seguidores, siguiendo FROM cuentas ORDER BY cuenta").fetchnumpy()
@@ -100,7 +107,8 @@ def correr(datos: Path, entrega: Path, base: Path, semilla: int = 0) -> dict:
     try:
         grupo_cuenta, info_coord = reloj.etapa(
             "coordinacion", detectar_coordinacion, n_cuentas=n_cuentas, cuenta=cuenta,
-            pub=com["pub"].astype(np.int64), ts=ts, narrativa=nar.narrativa, bando=bando_com)
+            pub=com["pub"].astype(np.int64), ts=ts, narrativa=nar.narrativa, bando=bando_com,
+            creada_ts=_a_float(cuentas["creada_ts"]))
     except Exception:  # la entrega sale igual, sin grupos
         traceback.print_exc()
         avisos.append("falló la etapa de coordinación: no se marcaron cuentas")
