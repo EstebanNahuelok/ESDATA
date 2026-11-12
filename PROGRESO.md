@@ -826,7 +826,7 @@ Script nuevo: `verificacion/sintetico_millon.py`. No toca el pipeline.
 
 ---
 
-# Jueves 12, 19:40 a 20:30: corrida del set final y entrega de seguridad
+# Jueves 12, 19:35 a 19:50: corrida del set final y entrega de seguridad
 
 ## Qué cambió en el enunciado
 
