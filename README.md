@@ -1,7 +1,7 @@
-# Narrativas y coordinación a escala — solución del equipo
+# Narrativas y coordinación a escala — equipo ESDATA
 
 **Desafío QualyData · Hackathon Argentina Space 2026 · Track Datos y Streaming**
-Equipo: Esteban y Damián.
+Equipo **ESDATA**: Esteban y Damián. Licencia: [MIT](LICENSE).
 
 Un pipeline que lee cientos de miles de comentarios y responde, en menos de medio minuto y sin gastar
 un centavo en IA: **qué narrativas circulan, desde cuándo, quién las apoya o las rechaza, y qué cuentas
@@ -281,4 +281,11 @@ almacen/         bases DuckDB locales (no se sube)
 salida/          corridas de práctica (no se sube)
 DESAFIO.md       enunciado original
 PROGRESO.md      bitácora de mediciones
+LICENSE          licencia MIT de nuestro código
 ```
+
+## Licencia
+
+El código del equipo ESDATA (`pipeline/`, `pruebas/`, `verificacion/`) y la documentación que escribimos se
+publican con licencia [MIT](LICENSE). El material de la organización (`DESAFIO.md`, `evaluacion/`, `ejemplos/`,
+`datos/practica/`) es de QualyData y no queda alcanzado por esa licencia.

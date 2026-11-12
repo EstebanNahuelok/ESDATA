@@ -752,5 +752,18 @@ Además: si la corrida tuvo alertas (set sin respuestas, tope de seguridad), el 
 - Lo que se sube: 39 archivos, 5,8 MB (el más grande es `datos/practica/comentarios.csv.gz`, 4,7 MB, de la organización). En ningún commit hubo archivos de `.venv`, `salida`, `almacen`, `datos/final`, bases DuckDB ni `.env`.
 - Claves y secretos: busqué en todos los commits de todas las ramas patrones de claves (OpenAI, Groq, Google, GitHub, AWS, Slack, claves privadas, `clave=valor` largos) y rutas o usuarios de la máquina. Sin coincidencias. No existe ningún `.env` en el disco.
 - Push de `main` y de `nucleo-pipeline`, sin forzar. El repo estaba vacío. Desde ahora, push después de cada commit.
-- **Pendiente importante:** `main` en el repo solo tiene el material original de la organización. Todo el trabajo está en `nucleo-pipeline`. Quien entre al repo o lo clone ve `main` por defecto, así que antes de la entrega hay que unir la rama a `main`.
+- **Pendiente importante:** `main` en el repo solo tiene el material original de la organización. Todo el trabajo está en `nucleo-pipeline`. Quien entre al repo o lo clone ve `main` por defecto, así que antes de la entrega hay que unir la rama a `main`. (Resuelto a las 18:50, ver abajo.)
 - `CLAUDE.md` sigue sin versionar y no se subió.
+
+
+---
+
+# Jueves 12, 18:50: main unificado, nombre del equipo y licencia
+
+- **`main` ya tiene todo el trabajo.** `nucleo-pipeline` se unió a `main` por avance rápido (sin commit de unión, sin forzar): las dos ramas apuntan al mismo commit, en local y en GitHub. Desde ahora cada commit se sube a las dos.
+- **Equipo ESDATA** en el título y la cabecera del README. **Licencia MIT** en `LICENSE`, con una sección en el README que aclara que cubre nuestro código y no el material de la organización.
+- **Novedad de la organización** (vista al traer su repo, commits del jueves 12 a las 14:51 y 18:35):
+  - El **set final ya está publicado** desde el jueves a las 17, en Releases del repo de la organización (etiqueta `set-final`). Son cuatro archivos que van a `datos/final/`.
+  - **Cierre: viernes 13 a las 13:00.** Hay que tener pusheados `entrega/` y el código que la generó.
+  - Regla nueva: no se puede editar a mano la entrega, y **a los equipos del podio el jurado les vuelve a correr el comando sobre el set final; si el resultado no se parece al entregado, quedan afuera**. Piden semillas fijas; si se usa IA, aceptan diferencias menores.
+  - Nuestro `DESAFIO.md` es la versión anterior del enunciado: todavía no trae estos cambios.
