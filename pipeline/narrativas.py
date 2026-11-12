@@ -9,7 +9,7 @@ Idea (ninguna regla depende del tema de los datos):
      (una frase de una narrativa recibe respuestas a una tasa conocida; cero respuestas es muy improbable).
    - CONTENIDO: el resto. Son las frases que sostienen o rechazan una narrativa.
 3. Grafo entre microgrupos de contenido: una respuesta con contenido propio contradice al comentario
-   que responde, así que ambos hablan de la misma narrativa (regla del README). Las comunidades de ese
+   que responde, así que ambos hablan de la misma narrativa (regla del enunciado). Las comunidades de ese
    grafo (Louvain; decide solo cuántas hay) son las narrativas, y juntan a quienes apoyan y rechazan.
 4. Toda respuesta hereda la narrativa del comentario al que responde.
 """

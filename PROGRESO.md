@@ -49,7 +49,7 @@ Paquete `pipeline/`, un módulo por etapa. Ningún id, tema, nombre de narrativa
 3. **`narrativas.py`** — Mira cómo participa cada microgrupo en los hilos:
    - casi siempre es respuesta ("tal cual") → **acuerdo**: hereda narrativa y postura del padre;
    - aparece muchas veces suelto y nadie le responde nunca → **ruido** (una frase de una narrativa recibe ~0,17 respuestas por comentario; cero respuestas en 30+ apariciones es muy improbable);
-   - el resto es **contenido**. Una respuesta con contenido propio contradice al comentario que responde (regla del README), así que los dos microgrupos son de la misma narrativa. Con esos enlaces se arma un grafo y sus comunidades (Louvain, decide solo cuántas hay) son las narrativas. Así quedan juntos quienes apoyan y quienes rechazan aunque usen palabras distintas.
+   - el resto es **contenido**. Una respuesta con contenido propio contradice al comentario que responde (regla del enunciado, `DESAFIO.md`), así que los dos microgrupos son de la misma narrativa. Con esos enlaces se arma un grafo y sus comunidades (Louvain, decide solo cuántas hay) son las narrativas. Así quedan juntos quienes apoyan y quienes rechazan aunque usen palabras distintas.
    - Toda respuesta hereda la narrativa del comentario al que responde.
 4. **`postura.py`** — Dentro de cada narrativa reparte los microgrupos en dos bandos para que las contradicciones queden cruzadas. Después decide cuál bando "apoya" con indicios generales: marcas de desmentida ("mentira", "falso", "nada que ver"...) → rechaza; la campaña coordinada empuja la narrativa → apoya; el bando con más comentarios sueltos, más redacciones y más volumen → apoya.
 5. **`origen.py`** — Primer comentario de la narrativa que tiene compañía (5 comentarios en 12 h), para ignorar apariciones aisladas.
@@ -87,10 +87,10 @@ Todos los números de esta tabla son del código final de la sesión (corrida de
 ## Qué no funciona o es un riesgo
 
 1. **Orientación de la postura (el punto más flojo).** Los dos bandos de cada narrativa salen bien separados (acierto ~100% o ~0% por narrativa, nunca a medias). El problema es decidir cuál bando "apoya" cuando no hay marcas de desmentida, ni campaña, ni diferencia de volumen. En práctica queda al revés 1 de 13 narrativas (la de la licitación) y en los recortes hasta 3. Eso es semántica y con estadísticas no se resuelve: en el set final espero entre 0,75 y 0,93.
-2. **El pipeline depende de los hilos de respuestas.** Usa dos reglas (una del README: la respuesta que contradice es de la misma narrativa; y una observada en práctica: al ruido nadie le responde y el ruido nunca es respuesta). Si el set final viniera sin `respuesta_a`, el plan B por palabras saca solo 0,38 de agrupamiento (parecido a la línea base). Con la mitad de los hilos rotos aguanta bien (0,97).
+2. **El pipeline depende de los hilos de respuestas.** Usa dos reglas (una del enunciado: la respuesta que contradice es de la misma narrativa; y una observada en práctica: al ruido nadie le responde y el ruido nunca es respuesta). Si el set final viniera sin `respuesta_a`, el plan B por palabras saca solo 0,38 de agrupamiento (parecido a la línea base). Con la mitad de los hilos rotos aguanta bien (0,97).
 3. **Coordinación con pocos días.** Con 5 días la campaña de cuentas viejas casi no se ve (5 de 30): necesita repetición. El set final tiene 10 días; el recorte de 7 días dio R entre 0,93 y 1,00.
 4. **Umbrales fijos de coordinación** (lift ≥ 40, ventana 30 min, k-truss 4). En práctica hay una meseta ancha (lift entre 20 y 100 da lo mismo), pero una campaña de otro estilo (por ejemplo coordinada entre publicaciones distintas, o con horas de diferencia) podría no verse.
-5. Falta el **README del equipo** (cómo correr, por qué DuckDB, qué existía antes). No lo toqué porque el README actual es el del desafío; conviene decidir si se reemplaza o se agrega un archivo aparte.
+5. ~~Falta el README del equipo~~ Hecho el jueves 12 (ver abajo).
 6. `CLAUDE.md` sigue sin versionar (no lo agregué a ningún commit).
 
 ## Qué probaría después (en orden)
@@ -106,3 +106,16 @@ Todos los números de esta tabla son del código final de la sesión (corrida de
 - Rama `nucleo-pipeline`, commits locales, sin push.
 - Exploración y recortes de prueba quedaron en `salida/scratch/` y `salida/variantes/` (no se versionan; se pueden borrar).
 - No se usó ninguna clave ni servicio externo.
+
+---
+
+# Sesión del jueves 12: lo que mira el jurado y la entrega
+
+Sin IA ni APIs. El núcleo no cambió; el puntaje de práctica se vuelve a medir al final de cada punto.
+
+## Punto 1 — README del equipo (jueves 12, 13:05) ✅
+
+- El `README.md` de la organización pasó a llamarse `DESAFIO.md` (con `git mv`, sin tocar el contenido). El `README.md` de la raíz ahora es el del equipo.
+- Contiene: resultado en práctica, cómo correr con un comando, cómo funciona cada etapa, por qué DuckDB, cómo escalaría a millones por día, qué código existía antes (evaluador y línea base de la organización, y qué dos ideas chicas tomamos de la línea base), y tres tablas que separan reglas generales, supuestos vistos en práctica y parámetros elegidos midiendo en práctica (con su sensibilidad).
+- Para revisar por el equipo: el README dice que el código se escribió con ayuda de un asistente de programación con IA. Si prefieren otra redacción, es una línea en la sección "Qué existía antes del evento".
+- Pendiente declarado en el propio README: no hay una corrida medida con millones de comentarios; la parte de escala es diseño.

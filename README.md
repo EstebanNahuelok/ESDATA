@@ -1,207 +1,208 @@
-# Desafío QualyData: narrativas y coordinación a escala
+# Narrativas y coordinación a escala — solución del equipo
 
-**Hackathon Argentina Space 2026** · Track Datos y Streaming · Centro de Convenciones de Salta · 11 al 13 de noviembre de 2026
+**Desafío QualyData · Hackathon Argentina Space 2026 · Track Datos y Streaming**
+Equipo: Esteban y Damián.
 
-> **Aviso.** Todos los datos de este repositorio son sintéticos. Las publicaciones, comentarios, cuentas, medios, lugares y empresas son ficticios y fueron generados por computadora. Cualquier parecido con hechos o personas reales es coincidencia. No hay datos personales.
+Un pipeline que lee cientos de miles de comentarios y responde, en menos de medio minuto y sin gastar
+un centavo en IA: **qué narrativas circulan, desde cuándo, quién las apoya o las rechaza, y qué cuentas
+las empujan de forma coordinada.**
 
-QualyData es una plataforma que integra y procesa grandes volúmenes de datos de múltiples fuentes para modelar escenarios y tomar decisiones. Este desafío toma uno de los problemas más difíciles de ese trabajo y lo abre a los equipos del hackathon.
+El enunciado original de la organización está en [`DESAFIO.md`](DESAFIO.md) (era el `README.md` del repo base;
+lo renombramos sin tocar el contenido). La bitácora con cada medición está en [`PROGRESO.md`](PROGRESO.md).
 
-## El problema
+> Todos los datos son sintéticos y los entrega la organización. No hay datos personales ni claves en el repo.
 
-Cuando miles de personas discuten un tema público, hay dos preguntas que importan:
+## Resultado en el set de práctica
 
-1. **¿Qué narrativas circulan?** Una narrativa es una afirmación o un encuadre que se repite con distintas palabras, por ejemplo "la obra está parada porque se robaron la plata". Interesa saber cuáles hay, quién las sostiene, quién las rechaza y cómo nació y se propagó cada una.
-2. **¿Qué parte es genuina y qué parte está armada?** Algunos grupos de cuentas actúan coordinados: publican lo mismo, al mismo tiempo y en los mismos lugares, para inflar una idea o instalar un rumor.
+Medido con el evaluador oficial (`evaluacion/puntuar.py`) sobre 200.000 comentarios:
 
-Hacerlo comentario por comentario con un modelo de IA es lento y caro. Hacerlo con palabras clave falla, porque la gente dice lo mismo de mil maneras. El desafío es construir algo que lo resuelva bien, rápido y barato.
-
-## El desafío
-
-Dos tareas sobre el mismo set de datos:
-
-- **Tarea A: narrativas.** Descubrir las narrativas que circulan (no hay una lista dada de antemano), asignar cada comentario a su narrativa o marcarlo como ruido, indicar si apoya o rechaza esa narrativa y estimar cuándo apareció cada una.
-- **Tarea B: coordinación.** Detectar las cuentas que actúan coordinadas y agruparlas por operación, separando la actividad armada de la opinión genuina.
-
-## Los datos
-
-El set de práctica está en `datos/practica/`:
-
-| Archivo | Contenido | Columnas |
+| Parte | Línea base de la organización | Nuestro pipeline |
 |---|---|---|
-| `fuentes.csv` | 8 páginas de medios, radios, comunidades e instituciones | `fuente_id, nombre, tipo` |
-| `publicaciones.csv.gz` | ~500 publicaciones en 14 días | `publicacion_id, fuente_id, fecha, titular` |
-| `comentarios.csv.gz` | 200.000 comentarios | `comentario_id, publicacion_id, cuenta_id, fecha, texto, respuesta_a, me_gusta` |
-| `cuentas.csv.gz` | ~16.000 cuentas activas | `cuenta_id, usuario, fecha_creacion, seguidores, siguiendo` |
+| Agrupamiento de narrativas (B-cubed F1) | 0,35 | 1,00 |
+| Detección de ruido (F1) | 0,67 | 1,00 |
+| Postura (macro-F1) | 0,49 | 0,93 |
+| Origen de narrativas emergentes | 0,33 | 1,00 |
+| Cuentas coordinadas (F1) | precisión 0,07 | 1,00 (115 de 115, sin falsos positivos) |
+| Grupos por operación (B-cubed F1) | — | 1,00 |
+| **Total automático** | **16,8 / 55** | **54,56 / 55** |
 
-Las fechas están en hora argentina (`-03:00`). `respuesta_a` tiene el `comentario_id` al que responde, o queda vacío.
+Costo: **27 segundos**, **640 MB** de memoria pico, base de **35 MB**, **0 tokens de IA, 0 USD**, en una
+notebook con 8 GB de RAM y sin GPU. Ese número es del set de práctica; el set final trae otros temas y
+otras campañas, y abajo decimos con honestidad qué puede fallar.
 
-**Formato.** Los archivos son CSV en UTF-8 con encabezado, comprimidos con gzip, que es el formato más universal. No imponemos base de datos ni herramienta: impórtenlos donde quieran (PostgreSQL, DuckDB, SQLite, ClickHouse, Elasticsearch, un dataframe, etc.). Elegir dónde y cómo guardar los datos es parte del desafío y lo evalúa el jurado (ver [Puntaje](#puntaje)).
+## Cómo correrlo
 
-**Qué hay adentro.** Como en una conversación real, el set incluye:
-- Narrativas que **cambian de redacción** con los días.
-- Narrativas que **aparecen a mitad del período**, incluidos rumores.
-- **Ruido**: reacciones, menciones, comentarios fuera de tema.
-- Campañas coordinadas de **distintos estilos**, algunas fáciles de ver y otras no.
-- **Trampas**: momentos virales genuinos donde mucha gente comenta a la vez y frases que se copian sin coordinación.
-
-**La verdad del set de práctica** está en `datos/practica/verdad/`, para que puedan medir su avance: narrativa y postura de cada comentario, campaña de cada cuenta y la descripción de cada narrativa y campaña. El set final no trae verdad.
-
-## Por qué no se resuelve en una tarde con IA
-
-- **Volumen:** son cientos de miles de comentarios. No entran en un prompt, y procesarlos uno por uno con un modelo es lento y caro.
-- **Costo:** se puntúa el costo por cada mil comentarios procesados.
-- **Redacción cambiante:** una misma narrativa aparece con palabras distintas a lo largo de los días, así que un match por palabras clave falla.
-- **Coordinación invisible:** no se ve comentario por comentario. Aparece solo mirando el conjunto: textos casi idénticos, ráfagas de horario, cuentas que siempre coinciden, antigüedad de las cuentas.
-- **Set final nuevo:** el día 3 se corre sobre un set con otros temas, otras narrativas y otras campañas. Gana el pipeline que generaliza, no el que se ajustó a mano al set de práctica.
-
-Se puede usar IA, por ejemplo para nombrar los grupos o resolver casos dudosos. La clave es usarla donde suma y no como único motor.
-
-## Cómo empezar
-
-Requisitos: Python 3.9 o superior.
+Requisitos: Python 3.10 o superior (lo probamos con 3.13 en Windows). No hace falta GPU, ni internet después de instalar.
 
 ```bash
 python -m venv .venv
 ```
 
 ```bash
-source .venv/bin/activate
+source .venv/bin/activate        # en Windows: .venv\Scripts\activate
 ```
 
 ```bash
 pip install -r requirements.txt
 ```
 
+**Un solo comando, de punta a punta**, sobre el set final:
+
 ```bash
-python ejemplos/linea_base.py --datos datos/practica --entrega salida/practica
+python -m pipeline.run --datos datos/final --entrega entrega
+```
+
+Sobre el set de práctica, y para medirlo:
+
+```bash
+python -m pipeline.run --datos datos/practica --entrega salida/practica
 ```
 
 ```bash
 python evaluacion/puntuar.py --verdad datos/practica/verdad --entrega salida/practica
 ```
 
-Las corridas de práctica van a `salida/`, que no se sube al repo. La carpeta `entrega/` queda reservada para el resultado del set final.
+`--datos` es la carpeta con `comentarios`, `cuentas`, `publicaciones` y `fuentes` (`.csv` o `.csv.gz`).
+Solo `comentarios` es obligatorio. En `--entrega` quedan `comentarios.csv`, `narrativas.csv`, `cuentas.csv`
+y `costo.json`, con el formato del enunciado.
 
-`ejemplos/linea_base.py` es una línea base mínima: agrupa con TF-IDF y k-means, asigna postura con una lista de palabras y marca cuentas que pegan el mismo texto en ráfagas. Saca alrededor de **17 de 55 puntos** automáticos en el set de práctica. Sirve para entender el formato y tener un piso; no es el camino a seguir.
+Opciones: `--base ruta.duckdb` (dónde guardar la base; por defecto `almacen/<nombre de la carpeta de datos>.duckdb`)
+y `--semilla N` (por defecto 0). Con la misma semilla, dos corridas dan archivos idénticos byte a byte.
 
-`evaluacion/puntuar.py` es exactamente el script que usa el jurado para la parte automática. No necesita instalar nada.
+Pruebas automáticas (20 segundos):
 
-## Cómo se entrega
-
-1. El viernes 13 se publica el set final. Descárguenlo en `datos/final/`, que no se sube al repo.
-2. Corran su pipeline sobre el set final y dejen el resultado en la carpeta `entrega/`, en la raíz de su repo.
-3. Commiteen y pusheen `entrega/` antes del cierre.
-4. Carguen el proyecto en la plataforma del hackathon (Hacki) con el link al repositorio público y un video de demo.
-
-Lo que se puntúa es lo que está en el repo a la hora de cierre. Al cierre, la organización clona cada repo y anota el commit; lo que se suba después no cuenta.
-
-## Formato de entrega
-
-La carpeta `entrega/` lleva cuatro archivos:
-
-**`comentarios.csv`**: una fila por comentario.
-
-| Columna | Valor |
-|---|---|
-| `comentario_id` | El id del comentario. |
-| `narrativa` | Una etiqueta propia para la narrativa, por ejemplo `n07`. Vacío o `ninguna` si es ruido. |
-| `postura` | `apoya` si el comentario afirma o respalda la narrativa, `rechaza` si la niega o la refuta. |
-
-**`narrativas.csv`**: una fila por narrativa detectada.
-
-| Columna | Valor |
-|---|---|
-| `narrativa` | La misma etiqueta usada en `comentarios.csv`. |
-| `titulo` | Una frase que resuma la afirmación. |
-| `frases_clave` | Términos separados por `|`. |
-| `fecha_origen` | Cuándo apareció, en formato ISO con zona horaria. Por ejemplo `2026-09-07T08:15:00-03:00`. |
-
-**`cuentas.csv`**: una fila por cuenta.
-
-| Columna | Valor |
-|---|---|
-| `cuenta_id` | El id de la cuenta. |
-| `grupo` | Una etiqueta propia para la operación coordinada. Vacío si la cuenta es genuina. Las cuentas de una misma operación llevan la misma etiqueta. |
-
-**`costo.json`**: cuánto costó procesar el set.
-
-```json
-{
-  "comentarios_procesados": 150000,
-  "segundos": 840,
-  "tokens_ia": 120000,
-  "usd_ia": 0.45,
-  "usd_por_mil_comentarios": 0.003,
-  "hardware": "notebook, 16 GB RAM, sin GPU",
-  "almacenamiento": "DuckDB local sobre Parquet",
-  "notas": "embeddings locales; IA solo para nombrar narrativas"
-}
+```bash
+python -m unittest discover -s pruebas
 ```
 
-Detalles de postura:
-- Las respuestas cortas que solo acompañan, como "Tal cual" o "Exacto", heredan la narrativa y la postura del comentario al que responden.
-- Una respuesta que contradice al comentario anterior pertenece a la misma narrativa, con la postura opuesta.
+## Cómo funciona
 
-## Puntaje
+Paquete `pipeline/`, un módulo por etapa:
 
-*Propuesta sujeta a las bases y condiciones del hackathon.*
-
-| Criterio | Puntos | Cómo se mide |
+| Etapa | Módulo | Qué hace |
 |---|---|---|
-| Calidad de narrativas | 30 | Automático sobre el set final. |
-| Detección de coordinación | 25 | Automático sobre el set final. |
-| Costo, escala y almacenamiento | 20 | Jurado: `costo.json` y tiempo de proceso; dónde y cómo guardan los datos, y por qué esa base; cómo escalaría a millones de comentarios por día. |
-| Robustez del pipeline | 15 | Jurado: corre de punta a punta con un comando, maneja datos sucios y es reproducible. |
-| Claridad y visualización | 10 | Jurado: demo y pitch. ¿Se entiende en un minuto qué circula, desde cuándo y quién lo empuja? |
+| Ingesta | `ingesta.py` | Lee los CSV como texto con DuckDB, limpia con SQL y deja tablas tipadas. Separa los **textos únicos**: de 200.000 comentarios solo hay 47.000 textos distintos después de normalizar, y solo esos se procesan. |
+| Texto | `texto.py`, `microgrupos.py` | Normaliza (tildes, emojis, abreviaturas, errores de tipeo) y junta las frases que son la misma con variaciones chicas (TF-IDF + agrupamiento por lotes, sin fijar la cantidad de grupos). Quedan unos 370 "microgrupos". |
+| Narrativas y ruido | `narrativas.py` | Usa la conversación, no solo las palabras. Una respuesta que contradice a un comentario habla de la misma narrativa: con esos enlaces arma un grafo de microgrupos y sus comunidades son las narrativas (el método decide cuántas hay). Así quedan juntos quienes apoyan y quienes rechazan, aunque usen palabras distintas. Las frases a las que nadie responde nunca son ruido. Un "tal cual" hereda la narrativa del comentario al que responde. |
+| Postura | `postura.py` | Dentro de cada narrativa separa dos bandos (los que se contradicen entre sí) y decide cuál apoya con indicios generales: marcas de desmentida, a quién empuja una campaña, volumen. |
+| Origen | `origen.py` | Primer comentario de la narrativa que tiene compañía (ignora apariciones aisladas). |
+| Coordinación | `coordinacion.py` | Busca cuentas que coinciden **una y otra vez** en la misma publicación y ventana de 30 minutos, y lo compara con lo esperable por azar según cuánto comenta cada una. Coincidir en una publicación viral casi no suma; coincidir donde hay poca gente, sí. Se queda con las mallas densas de cuentas (no con pares sueltos) y cada malla es una operación. |
+| Salida | `salida.py`, `run.py` | Escribe la entrega, mide tiempo y memoria de cada etapa y arma `costo.json`. Si coordinación o postura fallan, la entrega sale igual y el aviso queda en `costo.json`. |
 
-**Detalle de la parte automática:**
-- **Narrativas (30):**
-  - 50% agrupamiento, medido con B-cubed F1 sobre los comentarios que pertenecen a alguna narrativa. No importa cómo llamen a los grupos ni cuántos armen; importa que lo que va junto quede junto.
-  - 15% detección de ruido, medida con F1 sobre la clase "ninguna".
-  - 20% postura, medida con macro-F1 entre apoya y rechaza.
-  - 15% origen de las narrativas emergentes: puntaje completo si `fecha_origen` cae a menos de 3 horas del origen real, y cae a cero a las 48 horas.
-- **Coordinación (25):**
-  - 70% detección de cuentas coordinadas, medida con F1.
-  - 30% agrupamiento por operación, medido con B-cubed F1.
+No se manda ningún comentario a un modelo de IA. Todo es estadística, álgebra dispersa y grafos en CPU.
 
-## Reglas
+## Dónde se guardan los datos y por qué DuckDB
 
-**Requisitos excluyentes:**
-- Entrega el día 3 en Hacki: repositorio público con `entrega/` commiteada, video de demo y pitch ante el jurado.
-- El README del equipo explica cómo correr el pipeline, dónde guardan los datos y por qué eligieron esa base, y qué código o librerías existían antes del evento.
-- El pipeline corre de punta a punta con un comando sobre el set final. No se permite etiquetar a mano el set final; el jurado puede volver a correrlo.
-- Trabajo original hecho durante el hackathon. Se pueden usar librerías, modelos y servicios públicos.
-- Solo los datos provistos o fuentes públicas, sin datos personales.
-- Sin claves ni secretos en el repositorio.
+Los CSV de entrada se cargan una sola vez a **un archivo DuckDB local** (`almacen/<set>.duckdb`, ignorado por git).
+Ahí quedan las tablas limpias (`comentarios`, `textos`, `cuentas`, `publicaciones`, `fuentes`) y también los
+resultados (`res_comentarios`, `res_narrativas`, `res_cuentas`), listos para consultar con SQL o para un tablero.
 
-**Uso de IA:** está permitido. Todo lo que se gaste se reporta en `costo.json`. Si la organización entrega créditos, el presupuesto es el mismo para todos los equipos.
+Por qué DuckDB y no otra cosa:
 
-**Licencia:** proponemos que el código de los equipos se publique con licencia abierta (MIT o Apache 2.0), sujeto a lo que definan las bases.
+- **Es una base analítica por columnas.** Nuestras consultas son agregaciones y cruces sobre pocas columnas de muchas filas (contar por publicación y ventana, deduplicar textos, cruzar respuestas con sus padres). Para eso un motor por columnas es mucho más rápido que uno por filas como PostgreSQL o SQLite.
+- **No hay servidor que instalar ni administrar.** Es una librería (`pip install duckdb`) y un archivo. El jurado puede volver a correr todo con un comando, sin Docker ni credenciales.
+- **Lee CSV comprimido directo y tolera datos sucios.** La limpieza es SQL declarativo (`try_cast`, deduplicación por id), no bucles en Python.
+- **Trabaja con más datos que memoria.** Tiene límite de memoria configurable (usamos 2 GB) y vuelca a disco si hace falta. En una notebook de 8 GB eso importa.
+- **Es chica y barata.** 200.000 comentarios ocupan 35 MB. No hay costo de nube.
+- **El salto a escala es directo.** DuckDB lee y escribe Parquet particionado; el mismo SQL sirve sobre un lago de archivos o sobre MotherDuck/ClickHouse si algún día hace falta un servidor.
 
-## Cronograma
+Lo que descartamos: PostgreSQL (servidor, por filas, más lento en agregaciones), Elasticsearch (pensado para
+búsqueda, pesado para una notebook), solo dataframes en memoria (no escala y no deja nada consultable).
 
-| Día | Qué pasa |
+## Cómo escalaría a millones de comentarios por día
+
+Hoy: 200.000 comentarios en 27 s en una notebook (unos 7.000 comentarios por segundo, de punta a punta).
+Lo que cambia al crecer, etapa por etapa:
+
+1. **Ingesta por lotes diarios a Parquet particionado por fecha.** Cada día se agrega una partición; DuckDB consulta solo las particiones que necesita. Nada se reprocesa.
+2. **El texto no crece como los comentarios.** La gente repite frases: se guarda una tabla de textos únicos y solo se normalizan y vectorizan los textos nuevos del día. En práctica, después de normalizar, el 76% de los comentarios repite un texto ya visto.
+3. **Microgrupos incrementales.** El agrupamiento por "líder" ya trabaja en una pasada y por lotes: un texto nuevo se compara contra los centroides existentes (unos cientos) y se suma a uno o abre un grupo nuevo. No hay que reagrupar la historia.
+4. **Narrativas sobre el grafo de microgrupos, no sobre comentarios.** El grafo tiene cientos de nodos aunque haya millones de comentarios; recalcular comunidades tarda milisegundos. Los enlaces (respuestas) se acumulan como contadores.
+5. **Coordinación por ventanas.** Es la etapa más pesada (11 de los 27 s) porque cruza pares de cuentas. Escala bien porque: solo se cruzan cuentas que coinciden en la misma publicación y ventana; el producto ya se hace por bloques con memoria acotada; las celdas enormes (momentos virales) casi no aportan evidencia y se pueden muestrear; y se puede correr por día guardando los contadores de pares fuertes en una tabla, de modo que la repetición se acumula entre días.
+6. **Más de una máquina.** Los pasos 1, 2 y 5 se paralelizan por día o por publicación. Si el volumen pide un servidor, el almacenamiento pasa a ClickHouse o a DuckDB sobre almacenamiento de objetos sin cambiar la lógica.
+
+Lo que **no** medimos todavía: una corrida real con millones de comentarios. Los puntos de arriba son el diseño; el único número medido es el del set de práctica.
+
+## Qué existía antes del evento
+
+Código de la organización, que venía en el repo base y **no modificamos**:
+
+- `evaluacion/puntuar.py` — el evaluador oficial. Lo usamos para medir cada cambio.
+- `ejemplos/linea_base.py` — la línea base. No la usamos como punto de partida del pipeline. Tomamos de ahí dos ideas chicas, adaptadas: la normalización de texto (minúsculas, tildes, letras repetidas, abreviaturas de chat) y la idea de una lista de marcas de rechazo ("mentira", "falso", "nada que ver"...).
+- `DESAFIO.md` (ex `README.md`), `datos/practica/` y `requirements.txt` original.
+
+Librerías públicas que usamos (todas existían antes): `duckdb`, `numpy`, `scipy`, `scikit-learn` (solo TF-IDF),
+`networkx` (Louvain y k-truss), `pandas` (pasar tablas a DuckDB), `psutil` (medir memoria).
+
+Todo lo que está en `pipeline/` y `pruebas/` lo escribimos durante el hackathon (11 al 13 de noviembre de 2026),
+con ayuda de un asistente de programación con IA. El pipeline en sí no usa IA al correr.
+
+## Qué ajustamos mirando el set de práctica y qué es regla general
+
+El set final trae otros temas y otras campañas, así que separamos lo que es una regla del problema de lo que
+es un número que elegimos midiendo en práctica. **No hay ids, temas, nombres de narrativas ni fechas del set
+de práctica en el código.**
+
+### Reglas generales (no dependen de los datos)
+
+| Regla | De dónde sale |
 |---|---|
-| Miércoles 11 | Apertura y formación de equipos. Exploración de los datos y primera versión del pipeline. |
-| Jueves 12 | Mejoras, detección de coordinación y visualización. Mentorías. |
-| Viernes 13 | A la mañana se publica el set final; el horario se confirma en el evento. Cada equipo corre su pipeline, pushea `entrega/` y carga el proyecto en Hacki antes del cierre. Después, pitch ante el jurado. |
+| Una respuesta que contradice pertenece a la misma narrativa, con la postura opuesta. Una respuesta que solo acompaña hereda narrativa y postura. | Enunciado del desafío. |
+| Normalización de texto: minúsculas, tildes, emojis, enlaces, menciones, letras repetidas, abreviaturas de chat (`q`, `xq`, `x`, `pa`...), palabras vacías del castellano. | Conocimiento del idioma. |
+| Corrección de tipeo: una palabra rara se cambia por otra al menos 10 veces más frecuente que está a una letra invertida o duplicada. | Regla general; el vocabulario sale de cada set. |
+| Coincidencia pesada por 1/tamaño de la celda y comparada con lo esperable por azar (`n_a · n_b / N`). | Estadística; no depende del tamaño ni del tema del set. |
+| La antigüedad de las cuentas se usa solo en relación al propio grupo detectado (si el grupo fue creado en una franja de fechas rara en el set). No hay umbral de días. | Decisión de diseño para no sobreajustar. |
+| Prueba de ruido: "cero respuestas en tantas apariciones es muy improbable" (Poisson con la tasa de respuestas medida en el propio set, α = 0,01). | Estadística; la tasa se mide en cada set. |
+| Marcas de desmentida: "mentira", "falso", "verso", "nada que ver", "desmintió", "sin pruebas"... | Idioma. La lista parte de la línea base y la completamos mirando práctica (ver abajo). |
 
-## Pistas
+### Supuestos que vimos en práctica y que el set final podría no cumplir
 
-No son recetas, pero ayudan a pensar:
-- Los modelos de embeddings multilingües chicos corren en una notebook y agrupan por significado, no por palabras.
-- Cuántas narrativas hay no se sabe de antemano. Conviene un método que lo decida solo.
-- La postura depende de la narrativa: "es mentira que X" rechaza X, aunque use las mismas palabras que X.
-- Una ráfaga de comentarios no alcanza para hablar de coordinación. Lo que delata a una operación es la repetición: las mismas cuentas, juntas, una y otra vez.
-- Comparen contra lo esperable. Veinte comentarios en diez minutos es normal en una publicación viral y raro en una que nadie mira.
-- Las respuestas (`respuesta_a`), la antigüedad de las cuentas y los `me_gusta` también son señales.
+| Supuesto | Qué pasa si no se cumple |
+|---|---|
+| Al ruido nadie le responde y el ruido nunca es una respuesta. | Baja la detección de ruido: frases de ruido con respuestas pasarían a ser narrativas chicas. |
+| Las respuestas con texto propio contradicen (las que acuerdan son frases cortas tipo "tal cual"). | Se mezclarían los bandos de postura; el agrupamiento no cambia. |
+| Hay suficientes respuestas (en práctica, 14% de los comentarios). | Con la mitad de los hilos rotos el agrupamiento da 0,97. Sin ninguna respuesta cae a 0,38 (plan B por palabras). |
+| Las campañas repiten: las mismas cuentas coinciden varias veces. | Una campaña que actúa una sola vez no se ve. Con 5 días de datos detectamos 74% de las cuentas; con 7 días, 93-100%. |
 
-## Preguntas frecuentes
+### Parámetros elegidos midiendo en práctica
 
-**¿Cuántas narrativas y campañas hay?** En el set de práctica, todo está en `datos/practica/verdad/`. En el set final no se informa.
+| Parámetro | Valor | Cómo se eligió | Sensibilidad |
+|---|---|---|---|
+| Parecido mínimo para ser la misma frase (`umbral_micro`) | 0,5 | Pureza de los microgrupos contra la verdad. | Baja: con 0,5 la pureza es 99,99%. |
+| Tamaño mínimo de un microgrupo y parecido para absorber variantes raras | 30 comentarios / 0,25 | Pureza de las absorciones (100% por encima de 0,25). | Baja. |
+| Fracción de respuestas para tratar una frase como "acuerdo" | 0,9 | Mirando las frases tipo "tal cual". | Baja: las frases son casi todo respuesta o casi nada. |
+| Ventana de coincidencia | 30 minutos | Comparamos 15 y 30 minutos. | Media: depende del ritmo de las campañas. |
+| Lift mínimo de un par | 40 | Hay una meseta: entre 20 y 100 el resultado no cambia. | Baja dentro de la meseta. |
+| Repeticiones mínimas de un par | 2 (misma narrativa y bando) / 3 (solo tiempo) | Precisión contra la verdad. | Media. |
+| Densidad de la malla (k-truss) y tamaño mínimo de grupo | 4 / 5 cuentas | Precisión contra la verdad. | Media: con 3 aparecen falsos positivos. |
+| Ampliación de grupos: celdas "dominadas" | 3+ miembros y 1/3 de la celda; franja de creación rara si cubre < 2% de las cuentas | Probado en recortes del set. | Baja. |
+| Pesos de los indicios de postura | 20 / 20 / 0,5 / 1 / 1 | A mano, mirando práctica. Es la parte menos sólida. | Alta: es donde más esperamos fallar. |
+| Lista de marcas de desmentida | 21 expresiones | Línea base + las que vimos en práctica. | Media: otras campañas pueden desmentir con otras palabras. |
+| Origen: compañía mínima | 5 comentarios en 12 horas | Valor razonable; no se ajustó. | Baja. |
+| Plan B sin respuestas: parecido entre microgrupos | 0,1 | El mejor de los que probamos (y aun así flojo). | — |
 
-**¿El set final es parecido al de práctica?** Tiene la misma estructura de archivos y un volumen parecido (unos 150.000 comentarios en 10 días), pero otros temas, otras narrativas y otras campañas.
+Para no engañarnos con un puntaje casi perfecto, medimos el pipeline sobre recortes del set que no usamos para
+elegir nada (por días, por tema, con la mitad de las cuentas, con datos sucios, sin respuestas). La tabla
+completa está en [`PROGRESO.md`](PROGRESO.md).
 
-**¿Hace falta una interfaz?** No es obligatoria. Sí se evalúa cómo comunican los resultados: un dashboard, un notebook bien armado o una buena demo sirven.
+## Limitaciones conocidas
 
-**¿Puedo entrenar un modelo con la verdad del set de práctica?** Sí. Tengan en cuenta que en el set final los temas cambian, así que lo que aprendan tiene que generalizar.
+- **Postura:** los dos bandos de cada narrativa salen bien separados, pero decidir cuál "apoya" falla cuando no hay marcas de desmentida ni campaña. En práctica queda al revés 1 de 13 narrativas. Es un problema de significado; una sola llamada a un modelo de lenguaje con las frases representativas lo resolvería, y decidimos no usar IA por ahora.
+- **Dependencia de los hilos de respuestas:** ver la tabla de supuestos.
+- **Campañas de otro estilo** (coordinadas entre publicaciones distintas, o con horas de diferencia) podrían no verse con la ventana de 30 minutos.
+- **No medimos una corrida con millones de comentarios.**
+
+## Estructura del repo
+
+```
+pipeline/        nuestro código (un módulo por etapa; entrada: python -m pipeline.run)
+pruebas/         pruebas mínimas (formato, datos sucios, reproducibilidad)
+entrega/         resultado del set final (se genera el viernes 13)
+evaluacion/      evaluador oficial (de la organización)
+ejemplos/        línea base (de la organización)
+datos/practica/  set de práctica (de la organización); datos/final/ no se sube
+almacen/         bases DuckDB locales (no se sube)
+salida/          corridas de práctica (no se sube)
+DESAFIO.md       enunciado original
+PROGRESO.md      bitácora de mediciones
+```
