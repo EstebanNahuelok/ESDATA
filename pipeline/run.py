@@ -102,6 +102,14 @@ def correr(datos: Path, entrega: Path, base: Path, semilla: int = 0, hardware: s
         avisos.append("falló la etapa de coordinación: no se marcaron cuentas")
         grupo_cuenta, info_coord = np.full(n_cuentas, "", dtype=object), {"error": True}
     print(f"  {json.dumps(info_coord, ensure_ascii=False)}", flush=True)
+    tope = info_coord.get("tope", {})
+    if tope.get("activado"):
+        pasos = ", ".join(f"{x['umbral']} {x['antes']:g} -> {x['despues']:g} ({x['cuentas_marcadas']} cuentas)" for x in tope["pasos"])
+        avisos.append(
+            f"ALERTA: tope de seguridad de coordinación activado. Con los umbrales normales se marcaban {tope['marcadas_inicial']} "
+            f"cuentas (más del {100 * tope['tope_fraccion']:g}% del set), así que se endurecieron solos: {pasos}. "
+            + ("Quedó por debajo del tope" if tope["bajo_el_tope"] else "NO se logró bajar del tope: revisar la coordinación a mano"))
+        print(f"  {avisos[-1]}", flush=True)
 
     def etapa_postura():
         coordinado = (grupo_cuenta != "")[cuenta] if n_cuentas else None
@@ -133,6 +141,7 @@ def correr(datos: Path, entrega: Path, base: Path, semilla: int = 0, hardware: s
         costo = armar_costo(resumen["comentarios"], time.perf_counter() - reloj.inicio, reloj.etapas, resumen["archivos"],
                             base, entrega, avisos, semilla, hardware)
         costo["parametros_cambiados"] = dict(parametros or {})
+        costo["tope_coordinacion"] = tope
         escribir_costo(entrega, costo)
         return costo
 

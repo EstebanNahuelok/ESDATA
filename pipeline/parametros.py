@@ -84,13 +84,15 @@ PARAMETROS = [
               "Cuántas veces más que lo esperable por azar tienen que coincidir dos cuentas para ser un par fuerte."),
     Parametro("veces_con_texto", 2, "coordinacion", PRACTICA,
               "Coincidencias mínimas de un par cuando además empujan la misma narrativa y el mismo bando."),
-    Parametro("veces_sin_texto", 3, "coordinacion", PRACTICA,
-              "Coincidencias mínimas de un par cuando solo se mira publicación y tiempo."),
-    Parametro("min_pubs_compartidas", 1, "coordinacion", CRITERIO,
-              "Publicaciones distintas que tiene que compartir un par fuerte. Con 1 no filtra nada (valor actual); con 2 "
-              "descarta pares que solo coinciden dentro de una misma publicación viral."),
-    Parametro("k_truss", 4, "coordinacion", PRACTICA,
-              "Densidad de la malla: cada par fuerte tiene que compartir al menos k-2 cuentas en común con otros pares fuertes."),
+    Parametro("veces_sin_texto", 4, "coordinacion", PRACTICA,
+              "Coincidencias mínimas de un par cuando solo se mira publicación y tiempo. En práctica alcanzaba con 3; "
+              "se dejó un paso de margen porque con 2 aparecen cientos de falsos positivos."),
+    Parametro("min_pubs_compartidas", 2, "coordinacion", PRACTICA,
+              "Publicaciones distintas que tiene que compartir un par fuerte: coincidir dos veces dentro de una misma "
+              "publicación viral no cuenta como repetición. Con 1 no filtra nada."),
+    Parametro("k_truss", 5, "coordinacion", PRACTICA,
+              "Densidad de la malla: cada par fuerte tiene que compartir al menos k-2 cuentas en común con otros pares fuertes. "
+              "En práctica alcanzaba con 4; se dejó un paso de margen porque con 3 aparecen falsos positivos."),
     Parametro("min_grupo", 5, "coordinacion", CRITERIO, "Cuentas mínimas para que una malla cuente como operación."),
     Parametro("ampliar_min_celdas", 2, "coordinacion", CRITERIO,
               "Segunda pasada: una cuenta entra a un grupo si aparece en al menos estas celdas dominadas por el grupo."),
@@ -105,6 +107,11 @@ PARAMETROS = [
               "Cuentas con fecha de creación válida que necesita un grupo para calcular su franja.", False),
     Parametro("camada_franja", "percentiles 10 a 90 del grupo, con un margen igual a su ancho (mínimo 1 día)", "coordinacion",
               CRITERIO, "Cómo se arma la franja de fechas de creación de un grupo.", False),
+    Parametro("tope_fraccion", 0.05, "coordinacion", CRITERIO,
+              "Tope de seguridad: si se marca más de esta fracción de las cuentas como coordinadas, el resultado no es "
+              "creíble y los umbrales se endurecen solos, de a un paso, hasta quedar por debajo."),
+    Parametro("tope_max_pasos", 12, "coordinacion", CRITERIO,
+              "Cantidad máxima de pasos de endurecimiento del tope de seguridad."),
     Parametro("max_aristas", 200000, "coordinacion", TECNICO,
               "Resguardo: si hubiera más pares fuertes que esto, se conservan solo los de mayor lift.", False),
     Parametro("bloque", 4000, "coordinacion", TECNICO, "Cuentas por bloque al cruzar pares (acota la memoria).", False),

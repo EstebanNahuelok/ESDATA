@@ -665,3 +665,45 @@ Cada celda es total, cuentas marcadas y precisión / recall. Con `min_pubs_compa
 - La sensibilidad mueve los parámetros de a uno. No probé combinaciones, salvo la de la recomendación 2.
 - No probé con otra semilla (solo la usa Louvain, y la partición sale igual con resolución 0,5, 1 y 1,5, así que espero que no importe; no lo medí).
 - Sigue sin medirse una corrida con millones de comentarios.
+
+---
+
+# Jueves 12, 15:45: umbrales con margen y tope de seguridad
+
+## Umbrales activados (decisión del equipo)
+
+| Parámetro | Antes | Ahora |
+|---|---|---|
+| `min_pubs_compartidas` | 1 (no filtraba) | **2** |
+| `k_truss` | 4 | **5** |
+| `veces_sin_texto` | 3 | **4** |
+
+Confirmado en práctica: **54,56 / 55** y `comentarios.csv`, `narrativas.csv` y `cuentas.csv` **idénticos byte a byte** a la salida anterior (mismos md5). 115 cuentas en grupos de 60, 30 y 25.
+
+Lo que cambia con estos valores, medido en la verificación de la tarde: desaparece el grupo falso de 5 cuentas de la muestra chica; el set completo y las dos mitades quedan igual; en los dos recortes con hilos rotos se pierden 1 y 3 cuentas reales.
+
+Efecto lateral: las tablas de sensibilidad de más arriba se midieron con los valores viejos como base. Siguen valiendo como diagnóstico (ahí se ve por qué se movieron), pero "x0.5" y "x1.5" ya no parten del mismo número. No las volví a correr.
+
+## Tope de seguridad de coordinación
+
+- **Regla:** si se marca más del **5% de las cuentas** como coordinadas, el resultado no es creíble (una operación es una minoría chica). El pipeline endurece un umbral, vuelve a detectar, y repite hasta bajar del tope o llegar a 12 pasos.
+- **Orden de los pasos** (primero el que más falsos positivos evita, según la sensibilidad): `veces_con_texto` +1 → `k_truss` +1 → `veces_sin_texto` +1 → `ampliar_min_celdas` +1 → `lift_min` ×1,5 → `min_pubs_compartidas` +1, y vuelve a empezar.
+- **Dónde se avisa:** una línea `ALERTA: tope de seguridad de coordinación activado...` en la salida; el mismo texto en `notas` de `costo.json`; y el detalle paso a paso en la clave nueva `tope_coordinacion` de `costo.json` (umbral, valor antes y después, cuentas marcadas en cada paso, y si quedó o no por debajo del tope). Si no logra bajar del tope, lo dice.
+- Parámetros nuevos en `pipeline/parametros.py`: `tope_fraccion` (0,05) y `tope_max_pasos` (12). Son criterio, no salen de práctica.
+
+Pruebas que hice:
+
+| Prueba | Qué pasó |
+|---|---|
+| Práctica normal | No se activa (115 cuentas contra un tope de 799). Salida idéntica. |
+| Forzado con `--param veces_con_texto=1` | Sin tope marcaba 4.429 cuentas. Se activó, hizo un paso (`veces_con_texto` 1 → 2) y quedó en 115 cuentas, **54,56 / 55**. Tardó 63 s (una detección de más). |
+| Forzado con `--param tope_fraccion=0.005` (tope de 79 cuentas, más bajo que las 115 reales) | Hizo 7 pasos y terminó marcando 60 cuentas, todas reales, pero perdió dos campañas enteras (46,81 / 55). |
+| Prueba automática nueva | Con un detector simulado: se activa, sigue el orden, corta en el máximo de pasos y avisa si no bajó. Ahora son 24 pruebas. |
+
+Límites del tope, para que no se confíen:
+
+- **Cubre el desastre, no el error chico.** Un grupo falso de 5 o 50 cuentas no llega al 5% y pasa sin que el tope se entere. Para eso están los controles de cordura (tamaño de cada grupo) y mirar el reporte.
+- **Si se activa, baja el recall.** La tercera prueba lo muestra: endurecer de más pierde campañas reales. Si el viernes aparece la alerta, el resultado de coordinación hay que mirarlo con desconfianza, no darlo por bueno.
+- El 5% es un criterio mío. Si el set final tuviera de verdad más del 5% de cuentas coordinadas, el tope las recortaría.
+- Cada paso repite la detección (10 a 20 s más por paso).
+

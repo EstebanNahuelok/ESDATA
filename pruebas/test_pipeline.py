@@ -156,6 +156,33 @@ class ParametrosTest(Base):
         costo = correr(self.datos, self.entrega, self.tmp / "p.duckdb", parametros={"min_grupo": 8, "lift_min": 60})
         self.assertEqual(costo["parametros_cambiados"], {"min_grupo": 8, "lift_min": 60})
 
+    def test_tope_de_seguridad_de_coordinacion(self):
+        import numpy as np
+        from unittest import mock
+        from pipeline import coordinacion
+
+        def falso(n_cuentas, *_a, veces_con_texto=2, k_truss=5, **_k):
+            """Marca la mitad de las cuentas hasta que se endurecen dos umbrales; después, el 1%."""
+            marcadas = n_cuentas // 100 if (veces_con_texto >= 3 and k_truss >= 6) else n_cuentas // 2
+            grupo = np.full(n_cuentas, "", dtype=object)
+            grupo[:marcadas] = "g01"
+            return grupo, {"grupos": 1, "cuentas_marcadas": marcadas}
+
+        vacio = np.zeros(0)
+        with mock.patch.object(coordinacion, "_detectar_una_vez", side_effect=falso):
+            grupo, detalle = coordinacion.detectar_coordinacion(1000, vacio, vacio, vacio, vacio, vacio)
+            tope = detalle["tope"]
+            self.assertTrue(tope["activado"] and tope["bajo_el_tope"])
+            self.assertEqual([p["umbral"] for p in tope["pasos"]], ["veces_con_texto", "k_truss"])
+            self.assertEqual((tope["marcadas_inicial"], tope["marcadas_final"], int((grupo != "").sum())), (500, 10, 10))
+            # Si ni endureciendo todo se baja del tope, corta en el máximo de pasos y lo dice.
+            _g, detalle = coordinacion.detectar_coordinacion(1000, vacio, vacio, vacio, vacio, vacio, tope_fraccion=0.001, tope_max_pasos=4)
+            self.assertEqual(len(detalle["tope"]["pasos"]), 4)
+            self.assertFalse(detalle["tope"]["bajo_el_tope"])
+            # Por debajo del tope no toca nada.
+            _g, detalle = coordinacion.detectar_coordinacion(1000, vacio, vacio, vacio, vacio, vacio, tope_fraccion=0.9)
+            self.assertFalse(detalle["tope"]["activado"])
+
     def test_controles_de_cordura(self):
         normal = dict(comentarios=200000, comentarios_con_narrativa=162000, tam_narrativas=[18000] * 9, cuentas=16000,
                       cuentas_coordinadas=115, tam_grupos=[60, 30, 25])

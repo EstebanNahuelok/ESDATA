@@ -12,7 +12,10 @@ una y otra vez, mucho más de lo esperable por azar. Pasos:
 4. Grafo con los pares que coinciden varias veces y con lift alto. De ahí se conservan solo las zonas
    densas en triángulos (k-truss): las coincidencias por azar son aristas sueltas, una operación es una malla.
 5. Cada componente que queda, con un mínimo de cuentas, es una operación.
+6. Tope de seguridad: si aun así se marca más del 5% de las cuentas, los umbrales se endurecen solos.
 """
+import inspect
+
 import networkx as nx
 import numpy as np
 from scipy import sparse
@@ -126,11 +129,11 @@ def _ampliar(grupos, matrices, cuenta, n_cuentas, lift_min, creada_ts=None, min_
     return [np.flatnonzero(grupo_de == g).tolist() for g in range(len(grupos))]
 
 
-def detectar_coordinacion(n_cuentas, cuenta, pub, ts, narrativa, bando, ventana_s=1800, lift_min=40.0,
-                          veces_con_texto=2, veces_sin_texto=3, k_truss=4, min_grupo=5, max_aristas=200000,
-                          ampliar=True, creada_ts=None, usar_mensaje=True, ampliar_min_celdas=2, ampliar_min_miembros=3,
-                          ampliar_min_fraccion=1 / 3, camada_max_rareza=0.02, min_pubs_compartidas=1, **_):
-    """Devuelve (grupo por cuenta: '' = genuina, detalle para el informe).
+def _detectar_una_vez(n_cuentas, cuenta, pub, ts, narrativa, bando, ventana_s=1800, lift_min=40.0,
+                      veces_con_texto=2, veces_sin_texto=4, k_truss=5, min_grupo=5, max_aristas=200000,
+                      ampliar=True, creada_ts=None, usar_mensaje=True, ampliar_min_celdas=2, ampliar_min_miembros=3,
+                      ampliar_min_fraccion=1 / 3, camada_max_rareza=0.02, min_pubs_compartidas=2, **_):
+    """Una pasada de la detección. Devuelve (grupo por cuenta: '' = genuina, detalle para el informe).
 
     `usar_mensaje=False` apaga el canal A (cuando las narrativas no son confiables, por ejemplo si el set
     no trae hilos de respuestas): queda solo el canal de tiempo, que exige más repeticiones.
@@ -179,4 +182,42 @@ def detectar_coordinacion(n_cuentas, cuenta, pub, ts, narrativa, bando, ventana_
         grupo[miembros] = etiqueta
         detalle["grupos_detalle"].append({"grupo": etiqueta, "cuentas": len(miembros)})
     detalle.update({"aristas": len(aristas), "grupos": len(componentes), "cuentas_marcadas": int((grupo != "").sum())})
+    return grupo, detalle
+
+
+# Orden en que el tope de seguridad endurece los umbrales: primero el que más falsos positivos evita.
+ESCALERA_TOPE = [("veces_con_texto", lambda v: v + 1), ("k_truss", lambda v: v + 1), ("veces_sin_texto", lambda v: v + 1),
+                 ("ampliar_min_celdas", lambda v: v + 1), ("lift_min", lambda v: v * 1.5),
+                 ("min_pubs_compartidas", lambda v: v + 1)]
+_UMBRALES_POR_DEFECTO = {n: p.default for n, p in inspect.signature(_detectar_una_vez).parameters.items()
+                         if p.default is not inspect.Parameter.empty}
+
+
+def detectar_coordinacion(n_cuentas, cuenta, pub, ts, narrativa, bando, tope_fraccion=0.05, tope_max_pasos=12, **umbrales):
+    """Detección de cuentas coordinadas con tope de seguridad. Devuelve (grupo por cuenta, detalle).
+
+    Una operación coordinada es, por definición, una minoría chica. Si el resultado marca más de `tope_fraccion`
+    de las cuentas, lo más probable es que los umbrales estén flojos para este set (por ejemplo, porque las cuentas
+    genuinas coinciden más que en práctica), no que medio set esté coordinado. En ese caso se endurece un umbral
+    por vez, en el orden de ESCALERA_TOPE, y se vuelve a detectar, hasta quedar por debajo del tope o agotar
+    `tope_max_pasos`. Todo lo que se hizo queda en detalle["tope"] para avisarlo en la salida y en costo.json.
+    """
+    grupo, detalle = _detectar_una_vez(n_cuentas, cuenta, pub, ts, narrativa, bando, **umbrales)
+    limite = tope_fraccion * n_cuentas
+    marcadas = int((grupo != "").sum())
+    tope = {"activado": False, "tope_cuentas": int(limite), "tope_fraccion": tope_fraccion, "marcadas_inicial": marcadas,
+            "pasos": [], "bajo_el_tope": marcadas <= limite}
+    paso = 0
+    while marcadas > limite and paso < tope_max_pasos:
+        nombre, subir = ESCALERA_TOPE[paso % len(ESCALERA_TOPE)]
+        antes = umbrales.get(nombre, _UMBRALES_POR_DEFECTO[nombre])
+        umbrales[nombre] = subir(antes)
+        grupo, detalle = _detectar_una_vez(n_cuentas, cuenta, pub, ts, narrativa, bando, **umbrales)
+        marcadas = int((grupo != "").sum())
+        paso += 1
+        tope["pasos"].append({"paso": paso, "umbral": nombre, "antes": antes, "despues": umbrales[nombre],
+                              "cuentas_marcadas": marcadas})
+    if tope["pasos"]:
+        tope.update({"activado": True, "bajo_el_tope": marcadas <= limite, "marcadas_final": marcadas})
+    detalle["tope"] = tope
     return grupo, detalle

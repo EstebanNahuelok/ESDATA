@@ -97,7 +97,7 @@ encontramos las 115 cuentas coordinadas sin un solo falso positivo. Costo: cero 
 **Robustez (15 puntos)**
 
 - Un comando de punta a punta. Mismo resultado byte a byte en dos corridas y en dos entornos distintos.
-- 23 pruebas automáticas: archivos faltantes, columnas faltantes, fechas rotas, duplicados, hilos circulares,
+- 24 pruebas automáticas: archivos faltantes, columnas faltantes, fechas rotas, duplicados, hilos circulares,
   otra codificación, set vacío.
 - El pipeline valida su propia entrega contra el formato del enunciado antes de terminar.
 - Lo que tuvo que descartar o suponer queda escrito en `costo.json`.
@@ -127,9 +127,9 @@ agrupan mal: lo probamos y da 0,38 contra 1,00. Donde sí usaríamos un modelo e
 **¿Cómo saben que no marcan gente genuina?**
 Pedimos tres cosas a la vez: coincidir varias veces, mucho más de lo esperable según cuánto comenta cada
 cuenta, y formar un grupo denso, donde las coincidencias se cruzan entre muchas cuentas. En práctica, cero falsos positivos, y en los
-recortes grandes que no usamos para ajustar, precisión entre 0,99 y 1,00. No es infalible: en una muestra chica dominada por
-una publicación viral marcó un grupo falso de 5 cuentas, y los umbrales no tienen margen: un paso más flojos y aparecen
-falsos positivos.
+recortes grandes que no usamos para ajustar, precisión entre 0,99 y 1,00. No es infalible: probándolo con una muestra chica
+encontramos un grupo falso de 5 cuentas y lo corregimos. Y si en otro set marcara más del 5% de las cuentas, los umbrales
+se endurecen solos y queda avisado.
 
 **¿Usan la antigüedad de las cuentas?**
 No como umbral. Solo como refuerzo: si un grupo ya detectado fue creado todo en la misma semana, otra cuenta de
