@@ -5,3 +5,7 @@ salida/
 datos/final/
 .DS_Store
 almacen/
+.env
+.env.*
+*.duckdb
+*.duckdb.wal
