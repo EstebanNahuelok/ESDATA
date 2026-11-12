@@ -26,9 +26,10 @@ Medido con el evaluador oficial (`evaluacion/puntuar.py`) sobre 200.000 comentar
 | Grupos por operación (B-cubed F1) | — | 1,00 |
 | **Total automático** | **16,8 / 55** | **54,56 / 55** |
 
-Costo: **27 segundos**, **640 MB** de memoria pico, base de **35 MB**, **0 tokens de IA, 0 USD**, en una
-notebook con 8 GB de RAM y sin GPU. Ese número es del set de práctica; el set final trae otros temas y
-otras campañas, y abajo decimos con honestidad qué puede fallar.
+Costo: **entre 27 y 48 segundos** de punta a punta (según qué más esté corriendo en la notebook), **650 MB** de
+memoria pico, base de **35 MB**, **0 tokens de IA, 0 USD**, en una notebook con 8 GB de RAM y sin GPU.
+Ese número es del set de práctica; el set final trae otros temas y otras campañas, y abajo decimos con
+honestidad qué puede fallar.
 
 ## Cómo correrlo
 
@@ -75,8 +76,14 @@ commit final; solo usa la librería estándar:
 python -m pipeline.validar --entrega entrega --datos datos/final
 ```
 
+`costo.json` se arma con lo medido en cada corrida, nada a mano: comentarios procesados, segundos totales,
+memoria pico del proceso, equipo detectado (tipo, procesador, núcleos, RAM, GPU), tamaño de la entrada, de la
+base y de la entrega, tiempo y memoria de cada etapa, versiones de las librerías y avisos de la corrida.
+Trae las 8 claves del enunciado y algunas más.
+
 Opciones: `--base ruta.duckdb` (dónde guardar la base; por defecto `almacen/<nombre de la carpeta de datos>.duckdb`)
-y `--semilla N` (por defecto 0). Con la misma semilla, dos corridas dan archivos idénticos byte a byte.
+`--semilla N` (por defecto 0) y `--hardware "texto"` (para escribir a mano la descripción del equipo en
+`costo.json` en vez de la detectada). Con la misma semilla, dos corridas dan archivos idénticos byte a byte.
 
 Pruebas automáticas (25 segundos):
 
@@ -134,14 +141,14 @@ búsqueda, pesado para una notebook), solo dataframes en memoria (no escala y no
 
 ## Cómo escalaría a millones de comentarios por día
 
-Hoy: 200.000 comentarios en 27 s en una notebook (unos 7.000 comentarios por segundo, de punta a punta).
+Hoy: 200.000 comentarios en 27 a 48 s en una notebook (entre 4.000 y 7.000 comentarios por segundo, de punta a punta).
 Lo que cambia al crecer, etapa por etapa:
 
 1. **Ingesta por lotes diarios a Parquet particionado por fecha.** Cada día se agrega una partición; DuckDB consulta solo las particiones que necesita. Nada se reprocesa.
 2. **El texto no crece como los comentarios.** La gente repite frases: se guarda una tabla de textos únicos y solo se normalizan y vectorizan los textos nuevos del día. En práctica, después de normalizar, el 76% de los comentarios repite un texto ya visto.
 3. **Microgrupos incrementales.** El agrupamiento por "líder" ya trabaja en una pasada y por lotes: un texto nuevo se compara contra los centroides existentes (unos cientos) y se suma a uno o abre un grupo nuevo. No hay que reagrupar la historia.
 4. **Narrativas sobre el grafo de microgrupos, no sobre comentarios.** El grafo tiene cientos de nodos aunque haya millones de comentarios; recalcular comunidades tarda milisegundos. Los enlaces (respuestas) se acumulan como contadores.
-5. **Coordinación por ventanas.** Es la etapa más pesada (11 de los 27 s) porque cruza pares de cuentas. Escala bien porque: solo se cruzan cuentas que coinciden en la misma publicación y ventana; el producto ya se hace por bloques con memoria acotada; las celdas enormes (momentos virales) casi no aportan evidencia y se pueden muestrear; y se puede correr por día guardando los contadores de pares fuertes en una tabla, de modo que la repetición se acumula entre días.
+5. **Coordinación por ventanas.** Es la etapa más pesada (11 de 27 s en la mejor corrida) porque cruza pares de cuentas. Escala bien porque: solo se cruzan cuentas que coinciden en la misma publicación y ventana; el producto ya se hace por bloques con memoria acotada; las celdas enormes (momentos virales) casi no aportan evidencia y se pueden muestrear; y se puede correr por día guardando los contadores de pares fuertes en una tabla, de modo que la repetición se acumula entre días.
 6. **Más de una máquina.** Los pasos 1, 2 y 5 se paralelizan por día o por publicación. Si el volumen pide un servidor, el almacenamiento pasa a ClickHouse o a DuckDB sobre almacenamiento de objetos sin cambiar la lógica.
 
 Lo que **no** medimos todavía: una corrida real con millones de comentarios. Los puntos de arriba son el diseño; el único número medido es el del set de práctica.

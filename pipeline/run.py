@@ -9,8 +9,6 @@ comentarios.csv, narrativas.csv, cuentas.csv y costo.json. Al final valida el fo
 """
 import argparse
 import json
-import os
-import platform
 import sys
 import time
 import traceback
@@ -19,30 +17,12 @@ from pathlib import Path
 import numpy as np
 
 from .coordinacion import detectar_coordinacion
+from .costo import armar_costo, memoria_mb
 from .ingesta import ingerir
 from .narrativas import detectar_narrativas
 from .postura import calcular_bandos, orientar, postura_por_comentario
 from .salida import describir_narrativas, escribir_costo, escribir_entrega
 from .validar import EntregaInvalida, informe, validar_entrega
-
-try:
-    import psutil
-except ImportError:  # la medición de memoria es opcional
-    psutil = None
-
-
-def _memoria_mb():
-    if psutil is None:
-        return None, None
-    info = psutil.Process().memory_info()
-    pico = getattr(info, "peak_wset", None)
-    if pico is None:
-        try:
-            import resource
-            pico = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss * (1 if sys.platform == "darwin" else 1024)
-        except ImportError:
-            pico = info.rss
-    return round(info.rss / 2**20), round(pico / 2**20)
 
 
 class Reloj:
@@ -55,7 +35,7 @@ class Reloj:
     def etapa(self, nombre, funcion, *args, **kwargs):
         t0 = time.perf_counter()
         resultado = funcion(*args, **kwargs)
-        memoria, pico = _memoria_mb()
+        memoria, pico = memoria_mb()
         self.etapas[nombre] = {"segundos": round(time.perf_counter() - t0, 2), "memoria_mb": memoria, "pico_mb": pico}
         print(f"[{nombre}] {self.etapas[nombre]['segundos']} s, memoria {memoria} MB (pico {pico} MB)", flush=True)
         return resultado
@@ -68,12 +48,7 @@ def _a_float(columna) -> np.ndarray:
     return np.asarray(columna, dtype=np.float64)
 
 
-def _hardware() -> str:
-    ram = f"{round(psutil.virtual_memory().total / 2**30)} GB RAM" if psutil else "RAM sin medir"
-    return f"{platform.system()} {platform.machine()}, {os.cpu_count()} hilos de CPU, {ram}, no usa GPU"
-
-
-def correr(datos: Path, entrega: Path, base: Path, semilla: int = 0) -> dict:
+def correr(datos: Path, entrega: Path, base: Path, semilla: int = 0, hardware: str = None) -> dict:
     reloj = Reloj()
     np.random.seed(semilla)
     con, resumen = reloj.etapa("ingesta", ingerir, datos, base)
@@ -143,27 +118,18 @@ def correr(datos: Path, entrega: Path, base: Path, semilla: int = 0) -> dict:
     reloj.etapa("escritura", escribir_entrega, con, entrega, etiquetas, nar.narrativa, postura, filas, grupo_cuenta)
     con.close()
 
-    segundos = round(time.perf_counter() - reloj.inicio, 1)
-    _, pico = _memoria_mb()
-    costo = {
-        "comentarios_procesados": int(resumen["comentarios"]),
-        "segundos": segundos,
-        "tokens_ia": 0,
-        "usd_ia": 0.0,
-        "usd_por_mil_comentarios": 0.0,
-        "hardware": _hardware(),
-        "almacenamiento": f"DuckDB local, un solo archivo ({round(Path(base).stat().st_size / 2**20, 1)} MB)",
-        "notas": "Sin IA generativa ni servicios externos: TF-IDF + agrupamiento por lotes + grafos, todo en CPU. "
-                 + " ".join(avisos),
-        "memoria_pico_mb": pico,
-        "etapas": reloj.etapas,
-    }
-    escribir_costo(entrega, costo)
-    print(f"Listo en {segundos} s. Entrega en {entrega}/", flush=True)
+    def guardar_costo():
+        costo = armar_costo(resumen["comentarios"], time.perf_counter() - reloj.inicio, reloj.etapas, resumen["archivos"],
+                            base, entrega, avisos, semilla, hardware)
+        escribir_costo(entrega, costo)
+        return costo
 
     # Control final: los 4 archivos con el formato exacto del enunciado y los mismos ids que la entrada.
-    errores, avisos_formato, resumen_formato = validar_entrega(entrega, datos)
+    guardar_costo()
+    errores, avisos_formato, resumen_formato = reloj.etapa("validacion", validar_entrega, entrega, datos)
     print(informe(entrega, errores, avisos_formato, resumen_formato), flush=True)
+    costo = guardar_costo()  # se reescribe con el tiempo total, validación incluida
+    print(f"Listo en {costo['segundos']} s, memoria pico {costo['memoria_pico_mb']} MB. Entrega en {entrega}/", flush=True)
     if errores:
         raise EntregaInvalida(f"la entrega en {entrega} no cumple el formato: {errores[0]}")
     return costo
@@ -175,13 +141,14 @@ def main(argv=None):
     ap.add_argument("--entrega", type=Path, required=True, help="Carpeta donde se escriben los 4 archivos")
     ap.add_argument("--base", type=Path, default=None, help="Archivo DuckDB (por defecto almacen/<nombre de --datos>.duckdb)")
     ap.add_argument("--semilla", type=int, default=0)
+    ap.add_argument("--hardware", default=None, help="Texto para costo.json si no se quiere el equipo detectado solo")
     args = ap.parse_args(argv)
     base = args.base or Path("almacen") / f"{args.datos.resolve().name}.duckdb"
     for flujo in (sys.stdout, sys.stderr):
         if hasattr(flujo, "reconfigure"):
             flujo.reconfigure(encoding="utf-8", errors="replace")
     try:
-        correr(args.datos, args.entrega, base, args.semilla)
+        correr(args.datos, args.entrega, base, args.semilla, args.hardware)
     except FileNotFoundError as e:
         sys.exit(f"ERROR: {e}")
     except EntregaInvalida as e:

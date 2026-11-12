@@ -49,7 +49,8 @@ def _asegurar_utf8(ruta: Path, carpeta: Path):
         return destino, True
 
 
-def _cargar_crudo(con, datos: Path, nombre: str, columnas: list, obligatoria: bool, carpeta_tmp: Path, avisos: list):
+def _cargar_crudo(con, datos: Path, nombre: str, columnas: list, obligatoria: bool, carpeta_tmp: Path, avisos: list,
+                  archivos: list):
     """Carga un CSV como texto en `crudo_<nombre>`; las columnas que falten quedan en NULL."""
     ruta = _buscar(datos, nombre)
     if ruta is None:
@@ -59,6 +60,7 @@ def _cargar_crudo(con, datos: Path, nombre: str, columnas: list, obligatoria: bo
         con.execute(f"CREATE OR REPLACE TABLE crudo_{nombre} AS SELECT "
                     + ", ".join(f"NULL::VARCHAR AS {c}" for c in columnas) + " WHERE false")
         return 0
+    archivos.append(ruta)
     ruta, convertido = _asegurar_utf8(ruta, carpeta_tmp)
     if convertido:
         avisos.append(f"{nombre}.csv no estaba en UTF-8: se leyó como Windows-1252")
@@ -99,8 +101,9 @@ def ingerir(datos: Path, base: Path, memoria: str = "2GB", hilos: int = 4) -> tu
     con.execute(f"SET memory_limit='{memoria}'")
     con.execute(f"SET threads={hilos}")
     con.execute("SET enable_progress_bar=false")
-    avisos = []
-    crudos = {n: _cargar_crudo(con, datos, n, cols, n == "comentarios", base.parent, avisos) for n, cols in TABLAS.items()}
+    avisos, archivos = [], []
+    crudos = {n: _cargar_crudo(con, datos, n, cols, n == "comentarios", base.parent, avisos, archivos)
+              for n, cols in TABLAS.items()}
 
     # Zona horaria dominante del set (para escribir fecha_origen y para fechas que vengan sin zona).
     fila = con.execute("""SELECT regexp_extract(fecha, '([+-][0-9]{2}:[0-9]{2})$', 1) z, count(*) n
@@ -156,6 +159,7 @@ def ingerir(datos: Path, base: Path, memoria: str = "2GB", hilos: int = 4) -> tu
         "SELECT count(*), count(*) FILTER (ts IS NULL), count(*) FILTER (padre >= 0) FROM comentarios").fetchone()
     resumen = {
         "avisos": avisos,
+        "archivos": [str(a) for a in archivos],
         "zona": zona,
         "zona_seg": zona_seg,
         "filas_crudas": crudos,

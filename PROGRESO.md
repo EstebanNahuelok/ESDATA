@@ -147,3 +147,13 @@ Sin IA ni APIs. El núcleo no cambió; el puntaje de práctica se vuelve a medir
   - Avisos (no cortan): archivos de más en la carpeta, grupos de una sola cuenta, ninguna cuenta marcada, ruido con postura.
 - 8 pruebas nuevas que rompen una entrega buena de a un defecto y verifican que el validador lo señale (ahora son 20 pruebas, 36 s).
 - Práctica: validación OK (200.000 comentarios, 13 narrativas, 15.991 cuentas, 115 coordinadas en 3 grupos). Puntaje sin cambios: **54,56 / 55**.
+
+## Punto 4 — `costo.json` real (jueves 12, 13:07) ✅
+
+- Nuevo `pipeline/costo.py`. Todo sale de la corrida, nada escrito a mano. Las 8 claves del enunciado más: `memoria_pico_mb`, `comentarios_por_segundo`, `almacenamiento_mb` (entrada, base, entrega), `etapas` (segundos y memoria de cada una), `semilla` y `versiones`.
+- **Hardware detectado solo:** `notebook, Intel(R) Core(TM) i7-10510U CPU @ 1.80GHz (4 núcleos, 8 hilos), 8 GB de RAM, sin GPU (todo corre en CPU), Windows 10`. "Notebook" sale de que el equipo tiene batería; "sin GPU" de que no hay `nvidia-smi`. Si el jurado lo corre en otra máquina, el texto cambia solo. Con `--hardware "texto"` se puede fijar a mano.
+- **Almacenamiento:** `DuckDB local, un solo archivo de 35.0 MB (almacen/practica.duckdb) ...; entrada 4.8 MB en CSV comprimido, entrega 3.9 MB en CSV`. La entrada se mide sobre los archivos que realmente se leyeron.
+- **Segundos:** ahora incluyen la validación final (antes se cortaba al escribir la entrega). `notas` incluye la memoria pico y los avisos de la corrida.
+- **Ojo con el tiempo:** hoy la notebook está más lenta que ayer con el mismo código y el mismo entorno. Corridas de hoy: 29,5 s · 35,6 s · 42,2 s · 46,7 s · 48,4 s; ayer 26-27 s. La memoria pico no cambia (640-650 MB). Es carga de la máquina, no del pipeline (cada etapa se estira en la misma proporción). En el README puse "entre 27 y 48 segundos". Para el número del viernes conviene cerrar lo que no haga falta antes de correr.
+- Apareció algo que no hice yo: a las 12:56 se descomprimieron los `.csv.gz` en `datos/practica/` y `datos/practica/verdad/` (hay `comentarios.csv`, `cuentas.csv`, `publicaciones.csv` de 28 MB en total, sin versionar; el contenido es idéntico al de los `.gz`). No los toqué ni los agregué a ningún commit. El pipeline sigue leyendo los `.gz`. Si no los necesitan, conviene borrarlos para que no entren en un `git add -A`.
+- Práctica: **54,56 / 55**, sin cambios.
