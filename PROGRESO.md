@@ -891,3 +891,74 @@ Cuánto pesa: el punto 2 casi no mueve el puntaje automático (0,2% de los comen
 ## Entrega de seguridad
 
 `entrega/` (4 archivos) y `reporte/entrega.html` commiteados y pusheados a `main` y `nucleo-pipeline`. Si después se mejora algo, se vuelve a correr y se actualiza.
+
+
+---
+
+# Jueves 12, 20:10 a 20:45: cambios A y B en la rama `mejora-ab` (sin tocar `main`)
+
+Respaldo: etiqueta `entrega-segura` sobre el commit `4d53fde` de `main` (la entrega de seguridad). Todo lo de acá está en la rama `mejora-ab`.
+
+## Qué son
+
+- **A, consignas (`pipeline/consignas.py`, parámetro `reubicar_consignas`).** Corre después de coordinación. Una frase es consigna de una operación si más de la mitad de sus comentarios son de cuentas de esa operación y la dicen 3 o más. Su narrativa sale de las respuestas con contenido que cruza con cuentas no marcadas; si no hay ninguna, de la familia de frases más parecida en palabras (con `umbral_parecido`, que ya existía). Todas las consignas de una operación dentro de una narrativa van del mismo bando: el opuesto al de quienes las contradicen.
+- **B, misma frase (`pipeline/coordinacion.py`, parámetro `ampliar_misma_frase`).** La segunda pasada de coordinación se repite con celdas de "misma publicación, misma ventana y la misma frase", con los mismos umbrales de siempre.
+- Ningún número nuevo: "mayoría" y "3 cuentas" (el mismo mínimo que ya usa la segunda pasada) son criterios, no ajustes. Nada se eligió mirando el set final. Lo que sí salió de mirar el set final es la idea de las dos reglas, y el README lo dice.
+
+Lo que aprendí al diagnosticar (en el set final, solo mirando): la primera versión de A usaba todos los enlaces de conversación de la consigna y no movía casi nada. La causa: "Sí a la obra!", la respuesta con que las cuentas de la campaña se dan la razón entre sí, quedó en una familia de frases de la narrativa del sobreprecio (comparten la palabra "obra"), y esos enlaces arrastraban las consignas. De ahí la regla "las respuestas entre cuentas de la operación no cuentan como discusión". Las respuestas de gente de afuera a las consignas eran todas de la narrativa del dique.
+
+## Medición: práctica y recortes (total sobre 55)
+
+| Set | actual | solo A | solo B | A+B |
+|---|---|---|---|---|
+| completo | 54,56 | 54,56 | 54,56 | 54,56 |
+| primera_mitad | 54,33 | 54,33 | 54,33 | 54,33 |
+| segunda_mitad | 52,70 | 52,70 | 52,70 | 52,70 |
+| sin_respuestas | 35,24 | 35,24 | 35,24 | 35,24 |
+| mitad_enlaces | 51,92 | 51,93 | 51,92 | 51,93 |
+| mitad_respuestas_borradas | 53,74 | 53,74 | 53,74 | 53,74 |
+| muestra_20k_a | 40,41 | 40,41 | 42,15 | 42,15 |
+| muestra_20k_b | 32,60 | 32,60 | 32,60 | 32,60 |
+| muestra_20k_c | 28,51 | 28,51 | 28,51 | 28,51 |
+
+- Ningún set empeora. Cambian dos: `mitad_enlaces` (+0,01 por A) y `muestra_20k_a` (+1,74 por B: marca 26 cuentas en vez de 22, las 4 nuevas son reales, precisión 1,00).
+- En práctica completa los tres CSV son idénticos byte a byte a los de la versión actual: A encuentra 5 consignas y no mueve ninguna; B no suma cuentas.
+- ALERTA: ninguna nueva. La única es la de `sin_respuestas` (set sin hilos), que ya salía en la versión actual y sale igual en las cuatro. Con el set sin hilos A no corre.
+- Pruebas: 26 en verde (las 24 de antes y 2 nuevas de consignas).
+- Límite de esta medición: en práctica las reglas casi no tienen dónde actuar, así que práctica y recortes muestran que no rompen nada, no que mejoren. Se repite con `python verificacion/comparar_ab.py`.
+
+## Set final con A+B (dos corridas con el comando del README, CSV idénticos byte a byte; una tercera con librerías más viejas, también idéntica)
+
+| | Entrega de seguridad | Con A+B |
+|---|---|---|
+| Cuentas coordinadas | 98 (46, 30, 22) | 102 (50, 30, 22) |
+| Cuentas que cambian | | `u001834`, `u002867`, `u007143`, `u007666` pasan a g02 |
+| Comentarios que cambian | | 212 de 150.000 |
+| Ruido | 31.114 | 31.077 |
+| `narrativas.csv` | | idéntico (títulos, frases clave y fechas de origen) |
+| Validación, alertas, tope | OK, ninguna, no | OK, ninguna, no |
+
+Dónde cae cada consigna de la campaña del dique:
+
+| Consigna | Comentarios | Antes | Ahora |
+|---|---|---|---|
+| "Sí a la obra: el dique es agua para la ciudad y para el riego" | 44 | n08 apoya | n05 apoya |
+| "Agua para riego y para la ciudad. El dique es progreso" | 32 | n08 apoya | n05 apoya |
+| "El dique es agua para riego y para la ciudad. Sí a la obra" | 38 | n08 rechaza | n05 apoya |
+| "El dique es progreso: agua para regar y para la ciudad" | 39 | n05 apoya | n05 apoya |
+| "Queremos el dique: agua para el riego y para toda la ciudad" | 37 | ruido | n05 apoya |
+| "Progreso para el valle" | 12 | n08 apoya (9), n05 apoya (3) | n05 apoya |
+| "Sí a la obra!" | 14 | n08 rechaza (12), n05 rechaza (2) | n05 rechaza |
+
+(n05 es "Sin la represa los productores del valle se funden con la sequía"; n08 es "Se endeudan en dólares para una obra con sobreprecio".)
+
+Frase del reporte:
+
+- Antes: "Operación A (46 cuentas recién creadas, de tarde y de noche) empuja la narrativa Obra y sobreprecio: «Se endeudan en dólares para una obra con sobreprecio.»"
+- Ahora: "Operación A (50 cuentas recién creadas, de tarde y de noche) empuja la narrativa Agua y dique: «Sin la represa los productores del valle se funden con la sequía.»" (228 comentarios del grupo, apoyándola).
+
+Lo que NO se arregló:
+
+- **"Sí a la obra!" (14 comentarios)** pasa a la narrativa del dique pero queda como "rechaza". Esa frase quedó dentro de una familia de frases de otra narrativa, y A trabaja por familia entera.
+- **Las tres redacciones del rumor de g03 que quedaron como ruido (60 comentarios)** siguen como ruido, por lo mismo: están dentro de una familia de ruido más grande, no en una familia propia.
+- "no" como frase clave de n01 (no se tocó).

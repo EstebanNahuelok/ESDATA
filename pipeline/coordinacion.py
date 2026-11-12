@@ -132,14 +132,18 @@ def _ampliar(grupos, matrices, cuenta, n_cuentas, lift_min, creada_ts=None, min_
 def _detectar_una_vez(n_cuentas, cuenta, pub, ts, narrativa, bando, ventana_s=1800, lift_min=40.0,
                       veces_con_texto=2, veces_sin_texto=4, k_truss=5, min_grupo=5, max_aristas=200000,
                       ampliar=True, creada_ts=None, usar_mensaje=True, ampliar_min_celdas=2, ampliar_min_miembros=3,
-                      ampliar_min_fraccion=1 / 3, camada_max_rareza=0.02, min_pubs_compartidas=2, **_):
+                      ampliar_min_fraccion=1 / 3, camada_max_rareza=0.02, min_pubs_compartidas=2, micro=None,
+                      ampliar_misma_frase=1, **_):
     """Una pasada de la detección. Devuelve (grupo por cuenta: '' = genuina, detalle para el informe).
 
     `usar_mensaje=False` apaga el canal A (cuando las narrativas no son confiables, por ejemplo si el set
     no trae hilos de respuestas): queda solo el canal de tiempo, que exige más repeticiones.
+    `micro` es la familia de frases de cada comentario (-1 = sin texto): con `ampliar_misma_frase`, la segunda
+    pasada se repite con celdas de "misma frase" (misma publicación, misma ventana y la misma frase).
     """
     grupo = np.full(n_cuentas, "", dtype=object)
     validos = ~np.isnan(ts)
+    micro = None if micro is None else micro[validos]
     cuenta, pub, narrativa, bando = cuenta[validos], pub[validos], narrativa[validos], bando[validos]
     ts = ts[validos].astype(np.int64)
     if len(cuenta) == 0:
@@ -176,6 +180,15 @@ def _detectar_una_vez(n_cuentas, cuenta, pub, ts, narrativa, bando, ventana_s=18
         componentes = _ampliar(componentes, matrices[canal], cuenta, n_cuentas, lift_min, creada_ts,
                                min_celdas=ampliar_min_celdas, min_miembros=ampliar_min_miembros,
                                min_fraccion=ampliar_min_fraccion, max_rareza=camada_max_rareza)
+        con_frase = micro >= 0 if micro is not None else np.zeros(0, dtype=bool)
+        if ampliar_misma_frase and con_frase.any():
+            # Las consignas de una operación pueden quedar repartidas entre narrativas; la frase en sí no se reparte.
+            frases = _matrices(cuenta[con_frase], [pub[con_frase], micro[con_frase]], ts[con_frase], n_cuentas, ventana_s)
+            antes = sum(len(c) for c in componentes)
+            componentes = _ampliar(componentes, frases, cuenta, n_cuentas, lift_min, creada_ts,
+                                   min_celdas=ampliar_min_celdas, min_miembros=ampliar_min_miembros,
+                                   min_fraccion=ampliar_min_fraccion, max_rareza=camada_max_rareza)
+            detalle["sumadas_por_frase"] = int(sum(len(c) for c in componentes) - antes)
     detalle["grupos_detalle"] = []
     for pos, miembros in enumerate(componentes):
         etiqueta = f"g{pos + 1:02d}"

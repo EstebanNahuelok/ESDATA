@@ -17,6 +17,7 @@ from pathlib import Path
 
 import numpy as np
 
+from .consignas import reubicar_consignas
 from .coordinacion import detectar_coordinacion
 from .costo import armar_costo, memoria_mb
 from .ingesta import ingerir
@@ -96,7 +97,8 @@ def correr(datos: Path, entrega: Path, base: Path, semilla: int = 0, hardware: s
         grupo_cuenta, info_coord = reloj.etapa(
             "coordinacion", detectar_coordinacion, n_cuentas=n_cuentas, cuenta=cuenta,
             pub=com["pub"].astype(np.int64), ts=ts, narrativa=nar.narrativa, bando=bando_com,
-            creada_ts=_a_float(cuentas["creada_ts"]), usar_mensaje=nar.info["usa_hilos"], **de_etapa(p, "coordinacion"))
+            creada_ts=_a_float(cuentas["creada_ts"]), usar_mensaje=nar.info["usa_hilos"], micro=nar.micro,
+            **de_etapa(p, "coordinacion"))
     except Exception:  # la entrega sale igual, sin grupos
         traceback.print_exc()
         avisos.append("falló la etapa de coordinación: no se marcaron cuentas")
@@ -110,6 +112,15 @@ def correr(datos: Path, entrega: Path, base: Path, semilla: int = 0, hardware: s
             f"cuentas (más del {100 * tope['tope_fraccion']:g}% del set), así que se endurecieron solos: {pasos}. "
             + ("Quedó por debajo del tope" if tope["bajo_el_tope"] else "NO se logró bajar del tope: revisar la coordinación a mano"))
         print(f"  {avisos[-1]}", flush=True)
+
+    if p["reubicar_consignas"] and nar.info["usa_hilos"] and (grupo_cuenta != "").any():
+        try:
+            bando, info_consignas = reloj.etapa("consignas", reubicar_consignas, nar, bando, grupo_cuenta, cuenta, padre,
+                                                umbral_parecido=p["umbral_parecido"])
+            print(f"  {json.dumps(info_consignas, ensure_ascii=False)}", flush=True)
+        except Exception:
+            traceback.print_exc()
+            avisos.append("falló la reubicación de consignas: quedaron donde las dejó la conversación")
 
     def etapa_postura():
         coordinado = (grupo_cuenta != "")[cuenta] if n_cuentas else None

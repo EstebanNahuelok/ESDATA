@@ -41,9 +41,9 @@ puntaje: solo lo que el pipeline encontró.
 |---|---|
 | Narrativas | 12, sobre 3 temas; 3 aparecen durante el período |
 | Ruido | 20,7% de los comentarios |
-| Cuentas coordinadas | 98 de 12.002 (0,8%), en 3 grupos de 46, 30 y 22 cuentas |
-| Tiempo y memoria | 22,6 s, 569 MB de pico |
-| Almacenamiento | base DuckDB de 26,8 MB; entrada 3,4 MB, entrega 2,9 MB |
+| Cuentas coordinadas | 102 de 12.002 (0,85%), en 3 grupos de 50, 30 y 22 cuentas |
+| Tiempo y memoria | 22,2 s, 567 MB de pico |
+| Almacenamiento | base DuckDB de 25,8 MB; entrada 3,4 MB, entrega 2,9 MB |
 | IA | 0 tokens, 0 USD |
 | Validación y alertas | formato OK; ninguna alerta; el tope de seguridad no se activó |
 
@@ -54,8 +54,8 @@ versiones más viejas de las librerías) dieron los tres CSV idénticos byte a b
 corridas porque trae el tiempo y la memoria medidos. SHA-256 de lo entregado:
 
 ```
-172345b4fabac08473cdaec178ed3b4895a9b9ecfc26a2c4ea5fe0abcdabffcc  entrega/comentarios.csv
-417e124ffae240a248d999ca9a8fef5d91f7c20f27b63de4e3c8904ca90ad944  entrega/cuentas.csv
+904fa8f7eed75d7a9cf0fde09429c09e4bd1e55f011dcf6529572bd526ab9b54  entrega/comentarios.csv
+f7edca5224afc5a5f2c8a9fcd39657f08af561b35d84ad7be5071c7dd6d96557  entrega/cuentas.csv
 4db7053782dbded21839793ea515bc98de03cee242ad6648edf8dffb21e7f489  entrega/narrativas.csv
 ```
 
@@ -156,7 +156,7 @@ La coordinación tiene además un **tope de seguridad**: si se marca más del 5%
 endurecen solos, de a un paso, hasta bajar del tope. Lo que hizo queda en la salida y en `costo.json`
 (`tope_coordinacion` y `notas`).
 
-Pruebas automáticas (24 pruebas, unos 45 segundos):
+Pruebas automáticas (26 pruebas, unos 45 segundos):
 
 ```bash
 python -m unittest discover -s pruebas
@@ -186,7 +186,8 @@ Paquete `pipeline/`, un módulo por etapa:
 | Narrativas y ruido | `narrativas.py` | Usa la conversación, no solo las palabras. Una respuesta que contradice a un comentario habla de la misma narrativa: con esos enlaces arma un grafo de microgrupos y sus comunidades son las narrativas (el método decide cuántas hay). Así quedan juntos quienes apoyan y quienes rechazan, aunque usen palabras distintas. Las frases a las que nadie responde nunca son ruido. Un "tal cual" hereda la narrativa del comentario al que responde. |
 | Postura | `postura.py` | Dentro de cada narrativa separa dos bandos (los que se contradicen entre sí) y decide cuál apoya con indicios generales: marcas de desmentida, a quién empuja una campaña, volumen. |
 | Origen | `origen.py` | Primer comentario de la narrativa que tiene compañía (ignora apariciones aisladas). |
-| Coordinación | `coordinacion.py` | Busca cuentas que coinciden **una y otra vez** en la misma publicación y ventana de 30 minutos, y lo compara con lo esperable por azar según cuánto comenta cada una. Coincidir en una publicación viral casi no suma; coincidir donde hay poca gente, sí. Se queda con las mallas densas de cuentas (no con pares sueltos) y cada malla es una operación. |
+| Coordinación | `coordinacion.py` | Busca cuentas que coinciden **una y otra vez** en la misma publicación y ventana de 30 minutos, y lo compara con lo esperable por azar según cuánto comenta cada una. Coincidir en una publicación viral casi no suma; coincidir donde hay poca gente, sí. Se queda con las mallas densas de cuentas (no con pares sueltos) y cada malla es una operación. Después suma a cada operación las cuentas con poca actividad que aparecen en celdas dominadas por ella, mirando también quién repite la misma frase. |
+| Consignas | `consignas.py` | Las frases que dice casi solo una operación (sus consignas) casi no reciben respuestas de gente de afuera, así que la conversación no alcanza para ubicarlas. Se ubican por las respuestas de cuentas que no son de la operación o, si no hay, por parecido de palabras; y todas las consignas de una operación van del mismo bando. |
 | Salida | `salida.py`, `costo.py`, `validar.py`, `reporte.py`, `run.py` | Escribe la entrega, mide tiempo y memoria de cada etapa, arma `costo.json`, valida el formato y genera el reporte visual. Si coordinación o postura fallan, la entrega sale igual y el aviso queda en `costo.json`. |
 
 No se manda ningún comentario a un modelo de IA. Todo es estadística, álgebra dispersa y grafos en CPU.
@@ -265,7 +266,7 @@ con ayuda de un asistente de programación con IA. El pipeline en sí no usa IA 
 ## Qué ajustamos mirando el set de práctica y qué es regla general
 
 Todos los parámetros y umbrales están en un solo archivo, [`pipeline/parametros.py`](pipeline/parametros.py), cada uno
-con qué hace y de dónde salió su valor (`python -m pipeline.parametros` imprime la tabla completa: 47 parámetros).
+con qué hace y de dónde salió su valor (`python -m pipeline.parametros` imprime la tabla completa: 50 parámetros).
 Abajo va el resumen.
 
 El set final trae otros temas y otras campañas, así que separamos lo que es una regla del problema de lo que
@@ -283,6 +284,8 @@ de práctica en el código.**
 | La antigüedad de las cuentas se usa solo en relación al propio grupo detectado (si el grupo fue creado en una franja de fechas rara en el set). No hay umbral de días. | Decisión de diseño para no sobreajustar. |
 | Prueba de ruido: "cero respuestas en tantas apariciones es muy improbable" (Poisson con la tasa de respuestas medida en el propio set, α = 0,01). | Estadística; la tasa se mide en cada set. |
 | Marcas de desmentida: "mentira", "falso", "verso", "nada que ver", "desmintió", "sin pruebas"... | Idioma. La lista parte de la línea base y la completamos mirando práctica (ver abajo). |
+| Consignas: una frase es consigna de una operación si más de la mitad de sus comentarios son de cuentas de esa operación (y la dicen 3 o más). Las respuestas entre cuentas de la misma operación no cuentan como discusión, y una operación no discute consigo misma: sus consignas van todas del mismo bando. | Regla general. La agregamos después de ver el set final (las consignas de una campaña quedaban repartidas entre dos narrativas y el ruido), sin elegir ningún número con ese set: usa "mayoría" y parámetros que ya existían. En práctica no cambia el resultado. |
+| Segunda pasada de coordinación también por "misma frase" (misma publicación, misma ventana y la misma frase), con los mismos umbrales que la pasada por narrativa y bando. | Regla general, agregada por el mismo motivo. En práctica y en ocho recortes no cambia nada; en una muestra de 20.000 comentarios encuentra 4 cuentas más, todas reales. |
 
 ### Supuestos que vimos en práctica y que el set final podría no cumplir
 

@@ -10,6 +10,11 @@ import tempfile
 import unittest
 from pathlib import Path
 
+import numpy as np
+from scipy import sparse
+
+from pipeline.consignas import reubicar_consignas
+from pipeline.narrativas import CONTENIDO, RUIDO, Narrativas, recalcular_comentarios
 from pipeline.run import correr
 from pipeline.parametros import interpretar, resolver
 from pipeline.validar import controles_de_cordura, validar_entrega
@@ -137,6 +142,46 @@ class DatosChicosTest(Base):
     def test_falta_el_archivo_de_comentarios(self):
         with self.assertRaises(FileNotFoundError):
             self.correr()
+
+
+class ConsignasTest(unittest.TestCase):
+    """Dos narrativas (0 y 1), cada una con su afirmación y su respuesta, y dos consignas del grupo g01:
+    la familia 4 quedó como ruido y una persona de afuera le contesta con la respuesta de la narrativa 0;
+    la familia 5 quedó en la narrativa 1, nadie de afuera le contesta y en palabras es igual a la familia 0."""
+
+    def armar(self, grupo_de_los_tres="g01"):
+        micro = np.array([0] * 4 + [1] * 4 + [2] * 4 + [3] * 4 + [4] * 3 + [5] * 3 + [1, 4])
+        cuenta = np.array(list(range(3, 19)) + [0, 1, 2] + [0, 1, 2] + [19, 0])
+        padre = -np.ones(len(micro), dtype=np.int64)
+        padre[22], padre[23] = 16, 16     # responden a la consigna 4: una cuenta de afuera (con la familia 1) y una del grupo
+        tipo = np.array([CONTENIDO] * 4 + [RUIDO, CONTENIDO], dtype=np.int8)
+        comunidad = np.array([0, 0, 1, 1, -1, 1])
+        nar = Narrativas(micro=micro, tipo=tipo, comunidad=comunidad, narrativa=None, propio=None, ancla=None,
+                         aristas=sparse.csr_matrix((6, 6)), centroides=sparse.csr_matrix(np.eye(6)[[0, 1, 2, 3, 4, 0]]),
+                         vocabulario=np.array([]), norm_de_texto=np.array([]), normalizados=[], micro_de_norm=np.array([]))
+        recalcular_comentarios(nar, padre)
+        grupo_cuenta = np.array([grupo_de_los_tres] * 3 + [""] * 17, dtype=object)
+        return nar, np.array([1.0, -1.0, 1.0, -1.0, 0.0, -1.0]), grupo_cuenta, cuenta, padre
+
+    def test_se_ubican_por_la_conversacion_con_gente_de_afuera_o_por_palabras(self):
+        nar, bando, grupo_cuenta, cuenta, padre = self.armar()
+        self.assertEqual(nar.narrativa[16], -1)
+        nuevo, info = reubicar_consignas(nar, bando, grupo_cuenta, cuenta, padre)
+        self.assertEqual(info["consignas"], 2)
+        self.assertEqual(nar.tipo[4], CONTENIDO)
+        self.assertEqual(nar.comunidad[[4, 5]].tolist(), [0, 0])
+        self.assertEqual(nuevo[[4, 5]].tolist(), [1.0, 1.0])       # del lado opuesto al de quien las contradice
+        self.assertEqual(nar.narrativa[16:24].tolist(), [0] * 8)
+        self.assertEqual(nuevo[:4].tolist(), bando[:4].tolist())   # las familias de afuera no cambian
+
+    def test_sin_grupos_no_cambia_nada(self):
+        nar, bando, grupo_cuenta, cuenta, padre = self.armar(grupo_de_los_tres="")
+        antes = (nar.tipo.copy(), nar.comunidad.copy(), nar.narrativa.copy())
+        nuevo, info = reubicar_consignas(nar, bando, grupo_cuenta, cuenta, padre)
+        self.assertEqual(info["consignas"], 0)
+        self.assertEqual(nuevo.tolist(), bando.tolist())
+        for a, b in zip(antes, (nar.tipo, nar.comunidad, nar.narrativa)):
+            self.assertEqual(a.tolist(), b.tolist())
 
 
 class ParametrosTest(Base):

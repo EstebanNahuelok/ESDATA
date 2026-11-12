@@ -100,6 +100,9 @@ PARAMETROS = [
               "Segunda pasada: una celda está dominada por un grupo si tiene al menos estos miembros..."),
     Parametro("ampliar_min_fraccion", 1 / 3, "coordinacion", PRACTICA, "...y además son al menos esta fracción de la celda."),
     Parametro("ampliar_rondas", 3, "coordinacion", CRITERIO, "Cuántas veces se repite la segunda pasada.", False),
+    Parametro("ampliar_misma_frase", 1, "coordinacion", GENERAL,
+              "Segunda pasada también con celdas de 'misma frase' (misma publicación, misma ventana y la misma frase), con los "
+              "mismos umbrales: las consignas de una operación pueden quedar repartidas entre narrativas. 1 = sí, 0 = no."),
     Parametro("camada_max_rareza", 0.02, "coordinacion", PRACTICA,
               "La franja de fechas de creación de un grupo cuenta como indicio solo si menos de esta fracción de todas "
               "las cuentas del set fue creada en esa franja. Con ese indicio alcanza una sola celda dominada."),
@@ -115,6 +118,13 @@ PARAMETROS = [
     Parametro("max_aristas", 200000, "coordinacion", TECNICO,
               "Resguardo: si hubiera más pares fuertes que esto, se conservan solo los de mayor lift.", False),
     Parametro("bloque", 4000, "coordinacion", TECNICO, "Cuentas por bloque al cruzar pares (acota la memoria).", False),
+    # --- Consignas de las operaciones ----------------------------------------------------------------------
+    Parametro("reubicar_consignas", 1, "consignas", GENERAL,
+              "Las frases que dice casi solo un grupo coordinado (consignas) se ubican por su conversación con gente de "
+              "afuera del grupo o, si no la hay, por parecido de palabras (con `umbral_parecido`), y todas van del mismo "
+              "bando. 1 = sí, 0 = no."),
+    Parametro("consigna_mayoria", "más de la mitad de los comentarios de la frase, y 3 o más cuentas del grupo", "consignas",
+              CRITERIO, "Cuándo una frase es consigna de un grupo coordinado.", False),
     # --- Ingesta y salida ----------------------------------------------------------------------------------
     Parametro("memoria_duckdb", "2GB", "ingesta", TECNICO, "Límite de memoria de DuckDB; si hace falta más, usa disco.", False),
     Parametro("hilos_duckdb", 4, "ingesta", TECNICO, "Hilos de CPU que usa DuckDB.", False),

@@ -61,6 +61,28 @@ def _de_micro(valores: np.ndarray, micro: np.ndarray, vacio) -> np.ndarray:
     return valores[np.maximum(micro, 0)]
 
 
+def _por_comentario(tipo: np.ndarray, comunidad: np.ndarray, micro: np.ndarray, padre: np.ndarray) -> tuple:
+    """(propio, narrativa, ancla) de cada comentario a partir del tipo y la narrativa de cada microgrupo."""
+    n = len(micro)
+    es_resp = padre >= 0
+    propio = (micro >= 0) & (_de_micro(tipo, micro, RUIDO) == CONTENIDO)
+    # 5. Narrativa por comentario: los sueltos toman la de su microgrupo; las respuestas heredan del padre.
+    propia = np.where(propio, _de_micro(comunidad, micro, -1), -1)
+    narrativa = _resolver_hilos(np.where(es_resp, -1, propia), padre, es_resp)
+    sin_heredar = es_resp & (narrativa < 0)
+    narrativa[sin_heredar] = propia[sin_heredar]
+    ancla = _resolver_hilos(np.where(propio, np.arange(n), -1), padre, es_resp & ~propio)
+    return propio, narrativa, ancla
+
+
+def recalcular_comentarios(nar: "Narrativas", padre: np.ndarray) -> None:
+    """Vuelve a derivar lo que es por comentario después de cambiar el tipo o la narrativa de algún microgrupo."""
+    nar.propio, nar.narrativa, nar.ancla = _por_comentario(nar.tipo, nar.comunidad, nar.micro, padre)
+    nar.info.update({"microgrupos_contenido": int((nar.tipo == CONTENIDO).sum()), "microgrupos_ruido": int((nar.tipo == RUIDO).sum()),
+                     "narrativas": int(len(np.unique(nar.narrativa[nar.narrativa >= 0]))),
+                     "comentarios_ruido": int((nar.narrativa < 0).sum())})
+
+
 def _comunidades(aristas: sparse.csr_matrix, nodos: np.ndarray, semilla: int, resolucion: float) -> np.ndarray:
     """Louvain sobre el grafo de microgrupos. Devuelve la comunidad de cada microgrupo (-1 = fuera del grafo)."""
     com = -np.ones(aristas.shape[0], dtype=np.int64)
@@ -152,15 +174,8 @@ def detectar_narrativas(textos: list, n_textos: np.ndarray, texto_id: np.ndarray
         tipo[sin_narrativa[resp_recibidas[sin_narrativa] == 0]] = RUIDO
     huerfanos = np.flatnonzero((tipo == CONTENIDO) & (comunidad < 0))
     comunidad[huerfanos] = (comunidad.max() if k else -1) + 1 + np.arange(len(huerfanos))
-    propio = con_micro & (_de_micro(tipo, micro, RUIDO) == CONTENIDO)
 
-    # 5. Narrativa por comentario: los sueltos toman la de su microgrupo; las respuestas heredan del padre.
-    propia = np.where(propio, _de_micro(comunidad, micro, -1), -1)
-    narrativa = _resolver_hilos(np.where(es_resp, -1, propia), padre, es_resp)
-    sin_heredar = es_resp & (narrativa < 0)
-    narrativa[sin_heredar] = propia[sin_heredar]
-
-    ancla = _resolver_hilos(np.where(propio, np.arange(n), -1), padre, es_resp & ~propio)
+    propio, narrativa, ancla = _por_comentario(tipo, comunidad, micro, padre)
     info = {"textos_normalizados": int(len(normalizados)), "microgrupos": int(k),
             "microgrupos_contenido": int((tipo == CONTENIDO).sum()), "microgrupos_ruido": int((tipo == RUIDO).sum()),
             "microgrupos_acuerdo": int((tipo == ACUERDO).sum()), "tasa_respuestas": float(round(tasa, 4)),

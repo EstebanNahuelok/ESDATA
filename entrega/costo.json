@@ -1,64 +1,69 @@
 {
   "comentarios_procesados": 150000,
-  "segundos": 22.6,
+  "segundos": 22.2,
   "tokens_ia": 0,
   "usd_ia": 0.0,
   "usd_por_mil_comentarios": 0.0,
   "hardware": "notebook, Intel(R) Core(TM) i7-10510U CPU @ 1.80GHz (4 núcleos, 8 hilos), 8 GB de RAM, sin GPU (todo corre en CPU), Windows 10",
-  "almacenamiento": "DuckDB local, un solo archivo de 26.3 MB (almacen/final.duckdb) con las tablas limpias y los resultados; entrada 3.4 MB en CSV comprimido, entrega 2.9 MB en CSV",
-  "notas": "Sin IA generativa ni servicios externos: TF-IDF sobre textos únicos, agrupamiento por lotes y grafos, todo en CPU. Memoria pico del proceso: 569 MB.",
-  "memoria_pico_mb": 569,
-  "comentarios_por_segundo": 6627,
+  "almacenamiento": "DuckDB local, un solo archivo de 25.8 MB (almacen/final.duckdb) con las tablas limpias y los resultados; entrada 3.4 MB en CSV comprimido, entrega 2.9 MB en CSV",
+  "notas": "Sin IA generativa ni servicios externos: TF-IDF sobre textos únicos, agrupamiento por lotes y grafos, todo en CPU. Memoria pico del proceso: 567 MB.",
+  "memoria_pico_mb": 567,
+  "comentarios_por_segundo": 6764,
   "almacenamiento_mb": {
     "entrada_csv": 3.4,
-    "base_duckdb": 26.3,
+    "base_duckdb": 25.8,
     "entrega_csv": 2.9
   },
   "etapas": {
     "ingesta": {
-      "segundos": 5.98,
+      "segundos": 5.55,
       "memoria_mb": 185,
-      "pico_mb": 247
+      "pico_mb": 245
     },
     "narrativas": {
-      "segundos": 5.34,
-      "memoria_mb": 246,
+      "segundos": 5.03,
+      "memoria_mb": 244,
       "pico_mb": 374
     },
     "bandos": {
-      "segundos": 0.02,
+      "segundos": 0.01,
       "memoria_mb": 248,
       "pico_mb": 374
     },
     "coordinacion": {
-      "segundos": 7.16,
-      "memoria_mb": 230,
-      "pico_mb": 569
+      "segundos": 7.64,
+      "memoria_mb": 231,
+      "pico_mb": 567
+    },
+    "consignas": {
+      "segundos": 0.08,
+      "memoria_mb": 234,
+      "pico_mb": 567
     },
     "postura": {
       "segundos": 0.17,
-      "memoria_mb": 234,
-      "pico_mb": 569
+      "memoria_mb": 237,
+      "pico_mb": 567
     },
     "origen_y_titulos": {
-      "segundos": 0.06,
-      "memoria_mb": 236,
-      "pico_mb": 569
+      "segundos": 0.05,
+      "memoria_mb": 238,
+      "pico_mb": 567
     },
     "escritura": {
-      "segundos": 0.38,
-      "memoria_mb": 230,
-      "pico_mb": 569
+      "segundos": 0.36,
+      "memoria_mb": 231,
+      "pico_mb": 567
     },
     "validacion": {
       "segundos": 1.96,
-      "memoria_mb": 225,
-      "pico_mb": 569
+      "memoria_mb": 226,
+      "pico_mb": 567
     },
     "reporte": {
-      "segundos": 0.96,
-      "memoria_mb": 215,
-      "pico_mb": 569
+      "segundos": 0.9,
+      "memoria_mb": 217,
+      "pico_mb": 567
     }
   },
   "semilla": 0,
@@ -76,7 +81,7 @@
     "activado": false,
     "tope_cuentas": 600,
     "tope_fraccion": 0.05,
-    "marcadas_inicial": 98,
+    "marcadas_inicial": 102,
     "pasos": [],
     "bajo_el_tope": true
   }
