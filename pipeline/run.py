@@ -5,7 +5,8 @@
 
 Lee los CSV de --datos, los guarda en una base DuckDB local (--base) y escribe en --entrega
 comentarios.csv, narrativas.csv, cuentas.csv y costo.json. Al final valida el formato de la entrega
-(pipeline/validar.py) y termina con error si no cumple. No usa IA ni servicios externos.
+(pipeline/validar.py), termina con error si no cumple, y genera un reporte visual en reporte/<entrega>.html.
+No usa IA ni servicios externos.
 """
 import argparse
 import json
@@ -21,6 +22,7 @@ from .costo import armar_costo, memoria_mb
 from .ingesta import ingerir
 from .narrativas import detectar_narrativas
 from .postura import calcular_bandos, orientar, postura_por_comentario
+from .reporte import generar_reporte
 from .salida import describir_narrativas, escribir_costo, escribir_entrega
 from .validar import EntregaInvalida, informe, validar_entrega
 
@@ -48,7 +50,7 @@ def _a_float(columna) -> np.ndarray:
     return np.asarray(columna, dtype=np.float64)
 
 
-def correr(datos: Path, entrega: Path, base: Path, semilla: int = 0, hardware: str = None) -> dict:
+def correr(datos: Path, entrega: Path, base: Path, semilla: int = 0, hardware: str = None, reporte: Path = None) -> dict:
     reloj = Reloj()
     np.random.seed(semilla)
     con, resumen = reloj.etapa("ingesta", ingerir, datos, base)
@@ -128,7 +130,14 @@ def correr(datos: Path, entrega: Path, base: Path, semilla: int = 0, hardware: s
     guardar_costo()
     errores, avisos_formato, resumen_formato = reloj.etapa("validacion", validar_entrega, entrega, datos)
     print(informe(entrega, errores, avisos_formato, resumen_formato), flush=True)
-    costo = guardar_costo()  # se reescribe con el tiempo total, validación incluida
+    if reporte is not None and not errores:
+        try:  # extra aislado: si falla, la entrega ya está escrita y validada
+            ruta = reloj.etapa("reporte", generar_reporte, base, reporte, guardar_costo(), Path(datos).resolve().name)
+            print(f"Reporte visual en {ruta}", flush=True)
+        except Exception:
+            traceback.print_exc()
+            print("No se pudo generar el reporte visual (la entrega no se ve afectada).", flush=True)
+    costo = guardar_costo()  # se reescribe con el tiempo total, validación y reporte incluidos
     print(f"Listo en {costo['segundos']} s, memoria pico {costo['memoria_pico_mb']} MB. Entrega en {entrega}/", flush=True)
     if errores:
         raise EntregaInvalida(f"la entrega en {entrega} no cumple el formato: {errores[0]}")
@@ -142,13 +151,17 @@ def main(argv=None):
     ap.add_argument("--base", type=Path, default=None, help="Archivo DuckDB (por defecto almacen/<nombre de --datos>.duckdb)")
     ap.add_argument("--semilla", type=int, default=0)
     ap.add_argument("--hardware", default=None, help="Texto para costo.json si no se quiere el equipo detectado solo")
+    ap.add_argument("--reporte", type=Path, default=None,
+                    help="Archivo HTML del reporte visual (por defecto reporte/<nombre de --entrega>.html)")
+    ap.add_argument("--sin-reporte", action="store_true", help="No generar el reporte visual")
     args = ap.parse_args(argv)
     base = args.base or Path("almacen") / f"{args.datos.resolve().name}.duckdb"
     for flujo in (sys.stdout, sys.stderr):
         if hasattr(flujo, "reconfigure"):
             flujo.reconfigure(encoding="utf-8", errors="replace")
     try:
-        correr(args.datos, args.entrega, base, args.semilla, args.hardware)
+        reporte = None if args.sin_reporte else args.reporte or Path("reporte") / f"{args.entrega.resolve().name}.html"
+        correr(args.datos, args.entrega, base, args.semilla, args.hardware, reporte)
     except FileNotFoundError as e:
         sys.exit(f"ERROR: {e}")
     except EntregaInvalida as e:

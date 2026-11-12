@@ -7,6 +7,7 @@ tablas tipadas con índices enteros, que es lo que usa el resto del pipeline:
     textos(texto_id, texto, n)            -- textos únicos: se procesan una sola vez
     cuentas(cuenta, cuenta_id, creada_ts, seguidores, siguiendo)
     publicaciones(pub, publicacion_id, fuente_id, ts, titular)
+    meta(clave, valor)                    -- zona horaria dominante del set
 
 `ts` es el instante en segundos UTC; `hora_local` es la hora de reloj tal como viene escrita.
 """
@@ -152,6 +153,7 @@ def ingerir(datos: Path, base: Path, memoria: str = "2GB", hilos: int = 4) -> tu
         FROM _com3 h LEFT JOIN _com3 p ON p.comentario_id = h.respuesta_a AND p.i <> h.i
         ORDER BY h.i""")
     con.execute("CREATE OR REPLACE TABLE fuentes AS SELECT * FROM crudo_fuentes")
+    con.execute(f"CREATE OR REPLACE TABLE meta AS SELECT 'zona' AS clave, '{zona}' AS valor")
     for t in ("_com", "_com2", "_com3", *(f"crudo_{n}" for n in TABLAS)):
         con.execute(f"DROP TABLE {t}")
 

@@ -155,5 +155,21 @@ Sin IA ni APIs. El núcleo no cambió; el puntaje de práctica se vuelve a medir
 - **Almacenamiento:** `DuckDB local, un solo archivo de 35.0 MB (almacen/practica.duckdb) ...; entrada 4.8 MB en CSV comprimido, entrega 3.9 MB en CSV`. La entrada se mide sobre los archivos que realmente se leyeron.
 - **Segundos:** ahora incluyen la validación final (antes se cortaba al escribir la entrega). `notas` incluye la memoria pico y los avisos de la corrida.
 - **Ojo con el tiempo:** hoy la notebook está más lenta que ayer con el mismo código y el mismo entorno. Corridas de hoy: 29,5 s · 35,6 s · 42,2 s · 46,7 s · 48,4 s; ayer 26-27 s. La memoria pico no cambia (640-650 MB). Es carga de la máquina, no del pipeline (cada etapa se estira en la misma proporción). En el README puse "entre 27 y 48 segundos". Para el número del viernes conviene cerrar lo que no haga falta antes de correr.
-- Apareció algo que no hice yo: a las 12:56 se descomprimieron los `.csv.gz` en `datos/practica/` y `datos/practica/verdad/` (hay `comentarios.csv`, `cuentas.csv`, `publicaciones.csv` de 28 MB en total, sin versionar; el contenido es idéntico al de los `.gz`). No los toqué ni los agregué a ningún commit. El pipeline sigue leyendo los `.gz`. Si no los necesitan, conviene borrarlos para que no entren en un `git add -A`.
+- Para que lo sepan: durante la sesión aparecieron en `datos/practica/` y `datos/practica/verdad/` copias descomprimidas de los `.csv.gz` (28 MB, creadas a las 12:56, idénticas a los `.gz`) y unos minutos después ya no estaban. No las creé ni las borré yo, y no entraron en ningún commit. Si conviven `.csv` y `.csv.gz`, el pipeline lee el `.gz`.
+- Práctica: **54,56 / 55**, sin cambios.
+
+## Punto 5 — Reporte visual estático (jueves 12, 13:14) ✅
+
+- Nuevo `pipeline/reporte.py`: **un solo archivo HTML**, sin JavaScript, sin internet y sin librerías nuevas (gráficos SVG armados a mano). Pesa 140 KB. Lo genera el pipeline al final (0,9 s) en `reporte/<nombre de la entrega>.html`; el de práctica quedó versionado en `reporte/practica.html`.
+- Qué muestra, de arriba hacia abajo:
+  1. **Una frase y los hallazgos**: cuántas narrativas, cuántas nuevas, cuántas cuentas coordinadas, y una línea por grupo ("g03 (25 cuentas) originó la narrativa n13 ..., que apareció el dom 6 sep, 01:12").
+  2. **Tabla de narrativas**: título y frases clave, fecha de origen con etiqueta "nueva: día N" o "desde el inicio", línea de tiempo con el origen marcado y los comentarios del grupo que la empuja en color, barra apoya/rechaza, y qué grupo la originó o la empuja.
+  3. **Una tarjeta por grupo coordinado**: cuántas cuentas, qué narrativa empuja y con qué postura, cuántas ráfagas, antigüedad de las cuentas contra el resto, franja horaria, me gusta contra el resto, las frases que más repite, cuándo actúa y a qué hora.
+  4. Pie con el método en tres renglones y el costo.
+- En práctica el reporte cuenta la historia correcta (coincide con la verdad): g01 empuja "el litio trae trabajo", g02 empuja "no hubo consulta previa", g03 originó de madrugada "el hospital para la foto", y las otras dos narrativas nuevas no tienen empuje coordinado.
+- Lo revisé abriéndolo en un navegador sin interfaz (captura de pantalla, sin errores de consola, sin pedidos de red).
+- Aislado del núcleo: se genera después de escribir y validar la entrega, dentro de un `try`. Se regenera suelto con `python -m pipeline.reporte --base ... --salida ...`. Opciones nuevas del pipeline: `--reporte ruta.html` y `--sin-reporte`.
+- La base guarda ahora una tabla `meta` con la zona horaria del set (el reporte la usa para mostrar las fechas).
+- Las 20 pruebas ahora también generan el reporte (incluso con el set vacío y con datos sucios) y verifican que no tenga recursos externos.
+- Límite: en GitHub un HTML no se ve renderizado desde la página del repo; hay que bajarlo o activar GitHub Pages. Para el video de demo alcanza con abrirlo local.
 - Práctica: **54,56 / 55**, sin cambios.

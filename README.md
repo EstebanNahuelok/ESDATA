@@ -76,6 +76,23 @@ commit final; solo usa la librería estándar:
 python -m pipeline.validar --entrega entrega --datos datos/final
 ```
 
+### Reporte visual
+
+Cada corrida genera además **un archivo HTML estático** (`reporte/<nombre de la carpeta de entrega>.html`; para el
+set final, `reporte/entrega.html`). Se abre con doble clic, no necesita internet ni servidor, y muestra en una
+pantalla: las narrativas con su fecha de origen y su línea de tiempo, cuánto se apoya y se rechaza cada una, y
+los grupos de cuentas coordinadas con qué narrativa empujan, cuándo y a qué hora actúan y qué repiten.
+El del set de práctica está en [`reporte/practica.html`](reporte/practica.html).
+
+Se arma con consultas SQL sobre la base DuckDB, así que se puede regenerar sin volver a procesar nada:
+
+```bash
+python -m pipeline.reporte --base almacen/final.duckdb --salida reporte/entrega.html --costo entrega/costo.json
+```
+
+Es un extra aislado: se genera después de escribir y validar la entrega, y si fallara, la entrega no se ve
+afectada. `--sin-reporte` lo apaga y `--reporte ruta.html` cambia dónde se escribe.
+
 `costo.json` se arma con lo medido en cada corrida, nada a mano: comentarios procesados, segundos totales,
 memoria pico del proceso, equipo detectado (tipo, procesador, núcleos, RAM, GPU), tamaño de la entrada, de la
 base y de la entrega, tiempo y memoria de cada etapa, versiones de las librerías y avisos de la corrida.
@@ -85,7 +102,7 @@ Opciones: `--base ruta.duckdb` (dónde guardar la base; por defecto `almacen/<no
 `--semilla N` (por defecto 0) y `--hardware "texto"` (para escribir a mano la descripción del equipo en
 `costo.json` en vez de la detectada). Con la misma semilla, dos corridas dan archivos idénticos byte a byte.
 
-Pruebas automáticas (25 segundos):
+Pruebas automáticas (20 pruebas, 35 segundos):
 
 ```bash
 python -m unittest discover -s pruebas
@@ -117,7 +134,7 @@ Paquete `pipeline/`, un módulo por etapa:
 | Postura | `postura.py` | Dentro de cada narrativa separa dos bandos (los que se contradicen entre sí) y decide cuál apoya con indicios generales: marcas de desmentida, a quién empuja una campaña, volumen. |
 | Origen | `origen.py` | Primer comentario de la narrativa que tiene compañía (ignora apariciones aisladas). |
 | Coordinación | `coordinacion.py` | Busca cuentas que coinciden **una y otra vez** en la misma publicación y ventana de 30 minutos, y lo compara con lo esperable por azar según cuánto comenta cada una. Coincidir en una publicación viral casi no suma; coincidir donde hay poca gente, sí. Se queda con las mallas densas de cuentas (no con pares sueltos) y cada malla es una operación. |
-| Salida | `salida.py`, `run.py`, `validar.py` | Escribe la entrega, mide tiempo y memoria de cada etapa, arma `costo.json` y valida el formato. Si coordinación o postura fallan, la entrega sale igual y el aviso queda en `costo.json`. |
+| Salida | `salida.py`, `costo.py`, `validar.py`, `reporte.py`, `run.py` | Escribe la entrega, mide tiempo y memoria de cada etapa, arma `costo.json`, valida el formato y genera el reporte visual. Si coordinación o postura fallan, la entrega sale igual y el aviso queda en `costo.json`. |
 
 No se manda ningún comentario a un modelo de IA. Todo es estadística, álgebra dispersa y grafos en CPU.
 
@@ -228,6 +245,7 @@ completa está en [`PROGRESO.md`](PROGRESO.md).
 pipeline/        nuestro código (un módulo por etapa; entrada: python -m pipeline.run)
 pruebas/         pruebas mínimas (formato, datos sucios, reproducibilidad)
 entrega/         resultado del set final (se genera el viernes 13)
+reporte/         reporte visual en HTML de cada corrida
 evaluacion/      evaluador oficial (de la organización)
 ejemplos/        línea base (de la organización)
 datos/practica/  set de práctica (de la organización); datos/final/ no se sube
