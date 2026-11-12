@@ -108,7 +108,7 @@ def correr(datos: Path, entrega: Path, base: Path, semilla: int = 0) -> dict:
         grupo_cuenta, info_coord = reloj.etapa(
             "coordinacion", detectar_coordinacion, n_cuentas=n_cuentas, cuenta=cuenta,
             pub=com["pub"].astype(np.int64), ts=ts, narrativa=nar.narrativa, bando=bando_com,
-            creada_ts=_a_float(cuentas["creada_ts"]))
+            creada_ts=_a_float(cuentas["creada_ts"]), usar_mensaje=nar.info["usa_hilos"])
     except Exception:  # la entrega sale igual, sin grupos
         traceback.print_exc()
         avisos.append("falló la etapa de coordinación: no se marcaron cuentas")

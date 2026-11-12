@@ -73,7 +73,7 @@ def _comunidades(aristas: sparse.csr_matrix, nodos: np.ndarray, semilla: int, re
 def detectar_narrativas(textos: list, n_textos: np.ndarray, texto_id: np.ndarray, padre: np.ndarray,
                         semilla: int = 0, umbral_micro: float = 0.5, min_peso: int = 30,
                         umbral_parecido: float = 0.25, frac_acuerdo: float = 0.9, alfa_ruido: float = 0.01,
-                        resolucion: float = 1.0, min_respuestas: int = 50) -> Narrativas:
+                        resolucion: float = 1.0, min_respuestas: int = 50, umbral_sin_hilos: float = 0.1) -> Narrativas:
     n = len(texto_id)
     es_resp = padre >= 0
 
@@ -129,7 +129,7 @@ def detectar_narrativas(textos: list, n_textos: np.ndarray, texto_id: np.ndarray
     if not hay_hilos and len(nodos):
         # Plan B sin hilos: componentes conexas por parecido de palabras entre microgrupos.
         S = (C[nodos] @ C[nodos].T).tocsr()
-        S.data = (S.data >= 2 * umbral_parecido).astype(np.float32)
+        S.data = (S.data >= umbral_sin_hilos).astype(np.float32)
         S.eliminate_zeros()
         _, comp = sparse.csgraph.connected_components(S, directed=False)
         comunidad[nodos] = comp
@@ -141,7 +141,7 @@ def detectar_narrativas(textos: list, n_textos: np.ndarray, texto_id: np.ndarray
     if hay_hilos:
         tipo[sin_narrativa[resp_recibidas[sin_narrativa] == 0]] = RUIDO
     huerfanos = np.flatnonzero((tipo == CONTENIDO) & (comunidad < 0))
-    comunidad[huerfanos] = comunidad.max() + 1 + np.arange(len(huerfanos))
+    comunidad[huerfanos] = (comunidad.max() if k else -1) + 1 + np.arange(len(huerfanos))
     propio = con_micro & (tipo[np.maximum(micro, 0)] == CONTENIDO)
 
     # 5. Narrativa por comentario: los sueltos toman la de su microgrupo; las respuestas heredan del padre.
