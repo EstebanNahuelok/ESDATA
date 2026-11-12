@@ -173,3 +173,39 @@ Sin IA ni APIs. El núcleo no cambió; el puntaje de práctica se vuelve a medir
 - Las 20 pruebas ahora también generan el reporte (incluso con el set vacío y con datos sucios) y verifican que no tenga recursos externos.
 - Límite: en GitHub un HTML no se ve renderizado desde la página del repo; hay que bajarlo o activar GitHub Pages. Para el video de demo alcanza con abrirlo local.
 - Práctica: **54,56 / 55**, sin cambios.
+
+## Punto 6 — Borrador de `PITCH.md` (jueves 12, 13:16) ✅
+
+- `PITCH.md` en la raíz: la frase, versión de 3 minutos (problema, idea, coordinación, guion de demo sobre el reporte, resultados y costo, cierre), versión de 60 segundos, qué decir para cada criterio del jurado, las limitaciones dichas de frente, preguntas probables con respuesta y una lista para completar el viernes.
+- Todos los números son del set de práctica y están medidos; lo que depende del set final está marcado con **[VIERNES]**.
+- Es un borrador: el tono y el orden los tienen que ajustar ustedes ensayando en voz alta.
+
+## Estado al cierre de la sesión del jueves 12
+
+| | |
+|---|---|
+| Puntaje en práctica | **54,56 / 55** (sin cambios en toda la sesión; salida idéntica byte a byte) |
+| Tiempo | 27 a 48 s según la carga de la notebook; memoria pico 640-650 MB |
+| Pruebas | 20, todas pasan en el Python global y en el `.venv` nuevo |
+| Rama | `nucleo-pipeline`, 6 commits nuevos hoy, sin push |
+| IA y APIs | no se usó ninguna |
+
+Archivos nuevos hoy: `README.md` (equipo), `DESAFIO.md` (enunciado, renombrado), `requirements-lock.txt`, `pipeline/validar.py`, `pipeline/costo.py`, `pipeline/reporte.py`, `reporte/practica.html`, `PITCH.md`.
+
+### Nada se trabó. Lo que queda abierto
+
+1. **Postura** sigue en 0,93 en práctica y es lo menos confiable para el set final (sin IA no hay cómo mejorarlo de forma segura).
+2. **Escala**: el README explica el diseño pero no hay una corrida medida con millones de comentarios.
+3. **No probado**: Python anterior a 3.13, Linux y Mac.
+4. `CLAUDE.md` sigue sin versionar; decidan si va al repo público.
+5. Falta definir **licencia** (el enunciado propone MIT o Apache 2.0) y el **nombre del equipo** en el README.
+6. `main` todavía no tiene nada de esto: hay que unir la rama antes de la entrega.
+
+### Para el viernes 13, en orden
+
+1. Bajar el set final a `datos/final/`.
+2. Cerrar lo que no haga falta en la notebook (el tiempo queda en `costo.json`).
+3. `python -m pipeline.run --datos datos/final --entrega entrega`
+4. Leer la salida: tiene que terminar con "Validación de entrega: OK". Mirar cuántas narrativas y grupos salieron y abrir `reporte/entrega.html`: si algo se ve raro (una sola narrativa gigante, cientos de narrativas, cero grupos), avisar antes de entregar.
+5. `git add entrega reporte` + commit, unir a `main`, push.
+6. Completar los **[VIERNES]** de `PITCH.md` y cargar en Hacki con el link y el video.
