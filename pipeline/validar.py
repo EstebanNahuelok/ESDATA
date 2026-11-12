@@ -67,21 +67,37 @@ def _buscar_entrada(datos: Path, nombre: str):
     return None
 
 
+def _leer_entrada(ruta: Path) -> list:
+    """Lee un CSV de entrada con tolerancia (BOM, Windows-1252, separador ; o tabulador). Devuelve filas como dict."""
+    abrir = gzip.open if ruta.suffix == ".gz" else open
+    for codificacion in ("utf-8-sig", "cp1252"):
+        try:
+            with abrir(ruta, "rt", encoding=codificacion, newline="") as f:
+                primera = f.readline()
+                separador = max(",;\t|", key=primera.count)
+                f.seek(0)
+                return list(csv.DictReader(f, delimiter=separador))
+        except UnicodeDecodeError:
+            continue
+    return []
+
+
 def _ids_de_entrada(datos: Path, avisos: list):
     """Ids de comentarios y de cuentas que deberían estar en la entrega, leídos de los datos de entrada."""
-    comentarios, cuentas = None, None
     ruta = _buscar_entrada(datos, "comentarios")
     if ruta is None:
         avisos.append(f"no se encontró comentarios.csv(.gz) en {datos}: no se cruza contra la entrada")
         return None, None
-    ignorar = []
-    _, filas = _leer_csv(ruta, ignorar)
-    comentarios = {(f.get("comentario_id") or "").strip() for f in filas} - {""}
-    cuentas = {(f.get("cuenta_id") or "").strip() for f in filas if (f.get("comentario_id") or "").strip()} - {""}
-    ruta = _buscar_entrada(datos, "cuentas")
-    if ruta is not None:
-        _, filas = _leer_csv(ruta, ignorar)
-        cuentas |= {(f.get("cuenta_id") or "").strip() for f in filas} - {""}
+    try:
+        filas = _leer_entrada(ruta)
+        comentarios = {(f.get("comentario_id") or "").strip() for f in filas} - {""}
+        cuentas = {(f.get("cuenta_id") or "").strip() for f in filas if (f.get("comentario_id") or "").strip()} - {""}
+        ruta = _buscar_entrada(datos, "cuentas")
+        if ruta is not None:
+            cuentas |= {(f.get("cuenta_id") or "").strip() for f in _leer_entrada(ruta)} - {""}
+    except (OSError, csv.Error, EOFError) as e:
+        avisos.append(f"no se pudieron leer los datos de entrada ({e}): no se cruza contra la entrada")
+        return None, None
     return comentarios, cuentas
 
 

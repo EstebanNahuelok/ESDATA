@@ -113,14 +113,14 @@ Todos los números de esta tabla son del código final de la sesión (corrida de
 
 Sin IA ni APIs. El núcleo no cambió; el puntaje de práctica se vuelve a medir al final de cada punto.
 
-## Punto 1 — README del equipo (jueves 12, 13:05) ✅
+## Punto 1 — README del equipo (jueves 12, 12:50) ✅
 
 - El `README.md` de la organización pasó a llamarse `DESAFIO.md` (con `git mv`, sin tocar el contenido). El `README.md` de la raíz ahora es el del equipo.
 - Contiene: resultado en práctica, cómo correr con un comando, cómo funciona cada etapa, por qué DuckDB, cómo escalaría a millones por día, qué código existía antes (evaluador y línea base de la organización, y qué dos ideas chicas tomamos de la línea base), y tres tablas que separan reglas generales, supuestos vistos en práctica y parámetros elegidos midiendo en práctica (con su sensibilidad).
 - Para revisar por el equipo: el README dice que el código se escribió con ayuda de un asistente de programación con IA. Si prefieren otra redacción, es una línea en la sección "Qué existía antes del evento".
 - Pendiente declarado en el propio README: no hay una corrida medida con millones de comentarios; la parte de escala es diseño.
 
-## Punto 2 — Robustez e instalación desde cero (jueves 12, 13:50) ✅
+## Punto 2 — Robustez e instalación desde cero (jueves 12, 12:58) ✅
 
 - **Entorno virtual nuevo** en `.venv/` (ignorado por git; quedó creado y se puede seguir usando): `python -m venv .venv`, `pip install -r requirements.txt`, correr, medir y pruebas. Todo anduvo a la primera.
 - `requirements.txt` ya tenía todo (`duckdb` incluido). El entorno nuevo instaló versiones más nuevas que las del Python global (pandas 3.1, numpy 2.5, scikit-learn 1.9, networkx 3.7, scipy 1.18) y la salida es **idéntica byte a byte** a la del Python global (pandas 2.2, numpy 2.2, scikit-learn 1.6). Versiones exactas en `requirements-lock.txt` (nuevo).
@@ -132,3 +132,18 @@ Sin IA ni APIs. El núcleo no cambió; el puntaje de práctica se vuelve a medir
 - Además: un archivo que no está en UTF-8 se lee como Windows-1252 (antes se perdían las tildes), se aceptan BOM y separador `;`, y la zona horaria del set ya no se confunde cuando muchas fechas vienen rotas.
 - Los avisos de la ingesta (archivos o columnas que faltan, filas descartadas, comentarios sin fecha) quedan en `notas` de `costo.json`.
 - No probado: Python anterior a 3.13 (es el único instalado en la máquina) ni Linux/Mac.
+
+## Punto 3 — Validador de la entrega (jueves 12, 13:02) ✅
+
+- Nuevo `pipeline/validar.py` (solo librería estándar, como el evaluador). Se puede correr suelto: `python -m pipeline.validar --entrega entrega --datos datos/final` (código de salida 1 si hay errores).
+- El pipeline lo ejecuta **solo al final de cada corrida**; si la entrega no cumple, termina con error.
+- Qué controla, contra el formato de `DESAFIO.md`:
+  - están los 4 archivos y están en UTF-8;
+  - encabezados exactos: `comentario_id,narrativa,postura` · `narrativa,titulo,frases_clave,fecha_origen` · `cuenta_id,grupo`;
+  - ids sin vacíos ni repetidos; con `--datos`, que estén **exactamente** los comentarios y las cuentas de la entrada (la entrada se vuelve a leer con el módulo `csv` de Python, independiente de DuckDB);
+  - postura `apoya`/`rechaza` en todo comentario con narrativa; toda narrativa usada tiene su fila;
+  - `titulo` y `frases_clave` (separadas por `|`) no vacíos; `fecha_origen` ISO con zona horaria;
+  - `costo.json`: las 8 claves del enunciado con su tipo, sin negativos, y `comentarios_procesados` igual a las filas de `comentarios.csv`.
+  - Avisos (no cortan): archivos de más en la carpeta, grupos de una sola cuenta, ninguna cuenta marcada, ruido con postura.
+- 8 pruebas nuevas que rompen una entrega buena de a un defecto y verifican que el validador lo señale (ahora son 20 pruebas, 36 s).
+- Práctica: validación OK (200.000 comentarios, 13 narrativas, 15.991 cuentas, 115 coordinadas en 3 grupos). Puntaje sin cambios: **54,56 / 55**.

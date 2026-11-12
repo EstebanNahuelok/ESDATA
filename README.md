@@ -66,6 +66,15 @@ python evaluacion/puntuar.py --verdad datos/practica/verdad --entrega salida/pra
 Solo `comentarios` es obligatorio. En `--entrega` quedan `comentarios.csv`, `narrativas.csv`, `cuentas.csv`
 y `costo.json`, con el formato del enunciado.
 
+Al terminar, el pipeline **valida solo la entrega** (los 4 archivos, encabezados exactos, un id por comentario y
+por cuenta, posturas válidas, fechas ISO con zona horaria, claves de `costo.json`) y la cruza contra los datos
+de entrada. Si algo no cumple, termina con error. El mismo control se puede correr suelto, por ejemplo antes del
+commit final; solo usa la librería estándar:
+
+```bash
+python -m pipeline.validar --entrega entrega --datos datos/final
+```
+
 Opciones: `--base ruta.duckdb` (dónde guardar la base; por defecto `almacen/<nombre de la carpeta de datos>.duckdb`)
 y `--semilla N` (por defecto 0). Con la misma semilla, dos corridas dan archivos idénticos byte a byte.
 
@@ -101,7 +110,7 @@ Paquete `pipeline/`, un módulo por etapa:
 | Postura | `postura.py` | Dentro de cada narrativa separa dos bandos (los que se contradicen entre sí) y decide cuál apoya con indicios generales: marcas de desmentida, a quién empuja una campaña, volumen. |
 | Origen | `origen.py` | Primer comentario de la narrativa que tiene compañía (ignora apariciones aisladas). |
 | Coordinación | `coordinacion.py` | Busca cuentas que coinciden **una y otra vez** en la misma publicación y ventana de 30 minutos, y lo compara con lo esperable por azar según cuánto comenta cada una. Coincidir en una publicación viral casi no suma; coincidir donde hay poca gente, sí. Se queda con las mallas densas de cuentas (no con pares sueltos) y cada malla es una operación. |
-| Salida | `salida.py`, `run.py` | Escribe la entrega, mide tiempo y memoria de cada etapa y arma `costo.json`. Si coordinación o postura fallan, la entrega sale igual y el aviso queda en `costo.json`. |
+| Salida | `salida.py`, `run.py`, `validar.py` | Escribe la entrega, mide tiempo y memoria de cada etapa, arma `costo.json` y valida el formato. Si coordinación o postura fallan, la entrega sale igual y el aviso queda en `costo.json`. |
 
 No se manda ningún comentario a un modelo de IA. Todo es estadística, álgebra dispersa y grafos en CPU.
 

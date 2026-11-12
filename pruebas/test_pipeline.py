@@ -11,6 +11,7 @@ import unittest
 from pathlib import Path
 
 from pipeline.run import correr
+from pipeline.validar import validar_entrega
 from pipeline.texto import corregir_tipeo, normalizar
 
 RAIZ = Path(__file__).resolve().parent.parent
@@ -59,6 +60,8 @@ class Base(unittest.TestCase):
                 self.assertIn(c["postura"], ("apoya", "rechaza"))
         for n in narrativas:
             self.assertRegex(n["fecha_origen"], r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}[+-]\d{2}:\d{2}$")
+        errores, _avisos, _resumen = validar_entrega(entrega, self.datos)
+        self.assertEqual(errores, [])
         costo = json.loads((entrega / "costo.json").read_text(encoding="utf-8"))
         for clave in ("comentarios_procesados", "segundos", "tokens_ia", "usd_ia", "usd_por_mil_comentarios",
                       "hardware", "almacenamiento", "notas"):
@@ -129,6 +132,64 @@ class DatosChicosTest(Base):
     def test_falta_el_archivo_de_comentarios(self):
         with self.assertRaises(FileNotFoundError):
             self.correr()
+
+
+class ValidadorTest(Base):
+    """El validador tiene que aceptar una entrega buena y señalar cada tipo de defecto."""
+
+    def setUp(self):
+        super().setUp()
+        filas = [[f"c{i}", "p1", f"u{i % 9}", "2026-09-01T10:00:00-03:00", "La obra está parada hace más de un año", "", "0"] for i in range(30)]
+        escribir(self.datos / "comentarios.csv", COLUMNAS, filas)
+        self.correr()
+
+    def errores(self):
+        return validar_entrega(self.entrega, self.datos)[0]
+
+    def reescribir(self, archivo, cambio):
+        ruta = self.entrega / archivo
+        ruta.write_text(cambio(ruta.read_text(encoding="utf-8")), encoding="utf-8", newline="")
+
+    def test_entrega_buena(self):
+        self.assertEqual(self.errores(), [])
+
+    def test_falta_un_archivo(self):
+        (self.entrega / "cuentas.csv").unlink()
+        self.assertTrue(any("falta el archivo cuentas.csv" in e for e in self.errores()))
+
+    def test_encabezado_distinto(self):
+        self.reescribir("comentarios.csv", lambda t: t.replace("comentario_id,narrativa,postura", "id,narrativa,postura", 1))
+        self.assertTrue(any("encabezado" in e for e in self.errores()))
+
+    def test_postura_invalida(self):
+        self.reescribir("comentarios.csv", lambda t: t.replace(",apoya", ",a favor", 1))
+        self.assertTrue(any("postura" in e for e in self.errores()))
+
+    def test_falta_un_comentario_y_hay_un_repetido(self):
+        self.reescribir("comentarios.csv", lambda t: t.replace("c7,", "c8,", 1))
+        errores = " | ".join(self.errores())
+        self.assertIn("repetidos", errores)
+        self.assertIn("faltan 1 comentario_id", errores)
+
+    def test_fecha_sin_zona_horaria(self):
+        self.reescribir("narrativas.csv", lambda t: t.replace("-03:00", ""))
+        self.assertTrue(any("fecha_origen" in e for e in self.errores()))
+
+    def test_narrativa_sin_fila(self):
+        self.reescribir("comentarios.csv", lambda t: t.replace("n01,", "n99,", 1))
+        self.assertTrue(any("narrativas usadas" in e for e in self.errores()))
+
+    def test_costo_incompleto(self):
+        def romper(texto):
+            costo = json.loads(texto)
+            del costo["tokens_ia"]
+            costo["segundos"] = "rápido"
+            return json.dumps(costo, ensure_ascii=False)
+
+        self.reescribir("costo.json", romper)
+        errores = " | ".join(self.errores())
+        self.assertIn("falta la clave tokens_ia", errores)
+        self.assertIn("segundos debe ser un número", errores)
 
 
 @unittest.skipUnless((PRACTICA / "comentarios.csv.gz").exists(), "no está el set de práctica")

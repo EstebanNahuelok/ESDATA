@@ -4,7 +4,8 @@
     python -m pipeline.run --datos datos/final --entrega entrega
 
 Lee los CSV de --datos, los guarda en una base DuckDB local (--base) y escribe en --entrega
-comentarios.csv, narrativas.csv, cuentas.csv y costo.json. No usa IA ni servicios externos.
+comentarios.csv, narrativas.csv, cuentas.csv y costo.json. Al final valida el formato de la entrega
+(pipeline/validar.py) y termina con error si no cumple. No usa IA ni servicios externos.
 """
 import argparse
 import json
@@ -22,6 +23,7 @@ from .ingesta import ingerir
 from .narrativas import detectar_narrativas
 from .postura import calcular_bandos, orientar, postura_por_comentario
 from .salida import describir_narrativas, escribir_costo, escribir_entrega
+from .validar import EntregaInvalida, informe, validar_entrega
 
 try:
     import psutil
@@ -158,6 +160,12 @@ def correr(datos: Path, entrega: Path, base: Path, semilla: int = 0) -> dict:
     }
     escribir_costo(entrega, costo)
     print(f"Listo en {segundos} s. Entrega en {entrega}/", flush=True)
+
+    # Control final: los 4 archivos con el formato exacto del enunciado y los mismos ids que la entrada.
+    errores, avisos_formato, resumen_formato = validar_entrega(entrega, datos)
+    print(informe(entrega, errores, avisos_formato, resumen_formato), flush=True)
+    if errores:
+        raise EntregaInvalida(f"la entrega en {entrega} no cumple el formato: {errores[0]}")
     return costo
 
 
@@ -172,7 +180,12 @@ def main(argv=None):
     for flujo in (sys.stdout, sys.stderr):
         if hasattr(flujo, "reconfigure"):
             flujo.reconfigure(encoding="utf-8", errors="replace")
-    correr(args.datos, args.entrega, base, args.semilla)
+    try:
+        correr(args.datos, args.entrega, base, args.semilla)
+    except FileNotFoundError as e:
+        sys.exit(f"ERROR: {e}")
+    except EntregaInvalida as e:
+        sys.exit(f"ERROR: {e}")
 
 
 if __name__ == "__main__":
