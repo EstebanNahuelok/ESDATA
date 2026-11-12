@@ -187,7 +187,7 @@ Sin IA ni APIs. El núcleo no cambió; el puntaje de práctica se vuelve a medir
 | Puntaje en práctica | **54,56 / 55** (sin cambios en toda la sesión; salida idéntica byte a byte) |
 | Tiempo | 27 a 48 s según la carga de la notebook; memoria pico 640-650 MB |
 | Pruebas | 20, todas pasan en el Python global y en el `.venv` nuevo |
-| Rama | `nucleo-pipeline`, 6 commits nuevos hoy, sin push |
+| Rama | `nucleo-pipeline`, 8 commits nuevos hoy, sin push |
 | IA y APIs | no se usó ninguna |
 
 Archivos nuevos hoy: `README.md` (equipo), `DESAFIO.md` (enunciado, renombrado), `requirements-lock.txt`, `pipeline/validar.py`, `pipeline/costo.py`, `pipeline/reporte.py`, `reporte/practica.html`, `PITCH.md`.
