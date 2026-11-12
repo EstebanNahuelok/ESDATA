@@ -230,7 +230,7 @@ python verificacion/informe.py                    # junta todas las tablas
 1. **Narrativas y ruido son sólidos.** Aguantan mover cualquier parámetro ±50%, medio set, la mitad de los hilos rotos y una muestra de 20.000 comentarios (agrupamiento ≥ 0,96 en todos los casos con respuestas).
 2. **La coordinación está parada al borde de un escalón.** Cuatro umbrales enteros (`veces_con_texto`, `veces_sin_texto`, `k_truss`, `ampliar_min_celdas`) se desploman si se aflojan **un solo paso**: de 115 cuentas marcadas se pasa a 137, 202, 283 o 14.437. Endurecerlos un paso casi no cuesta nada. Detalle en el punto 2.
 3. **Encontré un falso positivo real**: en una muestra chica dominada por una publicación viral, el pipeline marcó como grupo coordinado a 5 cuentas genuinas. Hay un arreglo de una línea (`min_pubs_compartidas=2`) que lo elimina sin cambiar ningún otro resultado. **No lo activé: es decisión de ustedes** (punto 7).
-4. **La postura no mejora tocando pesos**: mover cualquiera de los cinco pesos ±50% no cambia nada, ni en el set completo ni en la segunda mitad. Las narrativas que quedan al revés quedan al revés con cualquier peso razonable. Sigue siendo lo más flojo (0,81 a 0,93 según el recorte).
+4. **La postura no mejora tocando pesos**: mover cualquiera de los cinco pesos ±50% no cambia nada, ni en el set completo ni en la segunda mitad. Las narrativas que quedan al revés quedan al revés con cualquier peso razonable. Sigue siendo lo más flojo (0,81 a 0,93 en el set completo y los recortes grandes).
 5. **Sin `respuesta_a` el pipeline no sirve para narrativas** (35,6 de 55). Ahora lo avisa con una alerta explícita.
 6. **La fecha de origen es frágil cuando el agrupamiento se ensucia o hay pocos datos**: perfecta con el set completo, pero cae a 0,67 con la mitad de los enlaces rotos y a 0,49 en una de las muestras chicas.
 7. **Controles de cordura** en práctica: 13 narrativas, 18,9% de ruido, 115 cuentas en grupos de 60, 30 y 25. Ninguno absurdo. Ahora el pipeline los imprime al final de cada corrida, con alertas si algo se sale de rango.
@@ -616,7 +616,7 @@ Tres muestras distintas: publicaciones completas elegidas al azar hasta juntar 2
 | Parte | ¿Sirve la muestra chica? | Por qué |
 |---|---|---|
 | Agrupamiento de narrativas | **Sí** (0,994 a 0,998) | Con 20.000 comentarios ya hay cientos de respuestas por narrativa. |
-| Ruido | **Sí** (0,980 a 0,995) | Las frases de ruido son muy repetidas; alcanzan pocas apariciones. Lo que baja un poco es que algunas frases no llegan al mínimo para que la prueba sea concluyente. |
+| Ruido | **Sí** (0,980 a 0,995) | Las frases de ruido son muy repetidas; alcanzan pocas apariciones. En la muestra c baja a 0,980: una frase de ruido que también se usa como respuesta ("Siempre lo mismo") quedó asignada a una narrativa. |
 | Separar los dos bandos | **Sí** | Sale del mismo grafo que las narrativas. |
 | Orientar la postura | A medias (0,89 a 1,00) | Varía según qué narrativas tengan marcas de desmentida en la muestra. No dice nada sobre el set completo. |
 | Fecha de origen | **No confiable** (1,00, 1,00 y 0,49) | Con pocos comentarios, los primeros de una narrativa quedan muy separados y la regla "5 comentarios en 12 horas" salta al primer momento denso (un día después). Además, una frase de ruido mal asignada corre el origen varios días. |
