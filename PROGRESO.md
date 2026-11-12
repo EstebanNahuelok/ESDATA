@@ -808,3 +808,17 @@ Script nuevo: `verificacion/escala.py`. Arma muestras anidadas de publicaciones 
 - Tiempo y memoria crecen en línea con los datos: unos 190 MB fijos más unos 2,3 MB por cada mil comentarios. Proyectado a un millón (sin medir): unos 2,5 GB.
 - El puntaje de las muestras chicas baja por coordinación: con 10.657 comentarios marca 0 de 39 cuentas; con 50.190, 10 de 95; con 100.287, 108 de 113. Siempre sin falsos positivos. Las narrativas se agrupan bien en todos los tamaños (0,970 / 0,998 / 1,000 / 1,000).
 - **No se midió "con todo lo demás cerrado".** Estaban abiertos el editor, un navegador (Brave), Discord y el agente; había entre 0,6 y 1,6 GB de RAM libre al empezar cada corrida. Las tres repeticiones dieron casi lo mismo (diferencias de menos de 1 s), así que el número parece estable, pero con la máquina libre puede ser algo mejor. Para repetirlo: `python verificacion/escala.py`.
+
+
+---
+
+# Jueves 12, 19:20: prueba sintética de un millón, lista pero SIN correr
+
+Script nuevo: `verificacion/sintetico_millon.py`. No toca el pipeline.
+
+- **Qué arma:** el set de práctica repetido 5 veces. Cada copia tiene otros ids de comentario, cuenta y publicación, y las fechas corridas 14 días (la copia 2 empieza donde termina la 1): un millón de comentarios, 79.955 cuentas, 2.530 publicaciones, 70 días. También repite la verdad, para controlar que el resultado siga siendo coherente.
+- **Qué mide y qué no:** los textos son los mismos, así que mide volumen (ingesta, hilos, cruce de cuentas, escritura, validación) y no variedad de texto.
+- **Protecciones:** corre el comando normal en otro proceso y lo corta si pasa los 15 minutos (contando el armado de datos), si el proceso usa más de la mitad de la RAM de la máquina, o si la RAM libre del sistema queda por debajo de 300 MB durante 10 segundos seguidos.
+- **Probado con una sola copia** (200.000 comentarios con ids cambiados): 39,6 s, 630 MB, 54,56 / 55, igual que el set original. Revisé también con dos copias que ids, respuestas, fechas y campañas queden bien armados (sin correr el pipeline).
+- **Por qué no corrí el millón todavía:** la tabla de escala proyecta unos 2,5 GB de memoria para un millón, y la notebook tenía entre 0,6 y 1,6 GB libres (editor, Brave, Discord y el agente abiertos; 3,2 GB ya en el archivo de paginación). Así, lo más probable es que la máquina se ponga muy lenta y que el vigilante corte la corrida antes de terminar, gastando el único intento. Queda esperando que Esteban cierre lo que pueda y dé el visto bueno.
+- Para correrlo: `python verificacion/sintetico_millon.py` (y `--tabla` para ver el resultado).
