@@ -127,6 +127,13 @@ def correr(datos: Path, entrega: Path, base: Path, semilla: int = 0, hardware: s
                                    ts, resumen["zona_seg"], **de_etapa(p, "origen"))
     for f in filas:
         print(f"  {f['narrativa']} {f['comentarios']:>6} {f['fecha_origen']}  {f['titulo'][:70]}", flush=True)
+    comunidad_de = {etiqueta: c for c, etiqueta in enumerate(etiquetas.tolist()) if etiqueta}
+    for f in filas:  # cuánta evidencia hubo para decidir qué bando apoya (lo muestra el reporte)
+        d = detalle_postura.get(comunidad_de.get(f["narrativa"]), {})
+        partes = {k: v for k, v in d.items() if k not in ("puntaje", "motivo")}
+        a_favor = {k: abs(v) for k, v in partes.items() if v * d.get("puntaje", 0) > 0}
+        f["puntaje_postura"] = abs(float(d.get("puntaje", 0.0)))
+        f["indicio_postura"] = d.get("motivo") or (max(a_favor, key=a_favor.get) if a_favor else "")
     sin_fecha = sum(f["sin_fecha"] for f in filas)
     if sin_fecha:
         avisos.append(f"{sin_fecha} narrativas sin ninguna fecha válida: su fecha_origen es la primera fecha del set")

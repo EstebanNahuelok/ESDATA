@@ -68,7 +68,10 @@ def escribir_entrega(con, entrega: Path, etiqueta_com: np.ndarray, narrativa: np
     post = np.where(narrativa < 0, "", np.where(postura < 0, "rechaza", "apoya"))
     res_com = pd.DataFrame({"i": np.arange(len(narrativa), dtype=np.int32), "narrativa": etiq, "postura": post})
     res_cta = pd.DataFrame({"cuenta": np.arange(len(grupo_cuenta), dtype=np.int32), "grupo": grupo_cuenta})
-    res_nar = pd.DataFrame(filas_narrativas, columns=["narrativa", "titulo", "frases_clave", "fecha_origen", "comentarios"])
+    # puntaje_postura e indicio_postura no van a narrativas.csv: los usa el reporte para decir cuánta confianza
+    # merece la orientación apoya/rechaza de cada narrativa.
+    res_nar = pd.DataFrame(filas_narrativas, columns=["narrativa", "titulo", "frases_clave", "fecha_origen", "comentarios",
+                                                      "puntaje_postura", "indicio_postura"])
     for nombre, df in (("res_comentarios", res_com), ("res_cuentas", res_cta), ("res_narrativas", res_nar)):
         con.register("_df", df)
         con.execute(f"CREATE OR REPLACE TABLE {nombre} AS SELECT * FROM _df")

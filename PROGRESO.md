@@ -707,3 +707,38 @@ Límites del tope, para que no se confíen:
 - El 5% es un criterio mío. Si el set final tuviera de verdad más del 5% de cuentas coordinadas, el tope las recortaría.
 - Cada paso repite la detección (10 a 20 s más por paso).
 
+---
+
+# Jueves 12, 16:05: reporte HTML rehecho
+
+Los ocho cambios pedidos, más el diseño. `reporte/practica.html` quedó regenerado (55 KB, un solo archivo, sin JavaScript ni recursos externos). La entrega no cambia: **54,56 / 55**, archivos idénticos byte a byte, 24 pruebas.
+
+| Pedido | Cómo quedó |
+|---|---|
+| 1. Caja "Cómo leer esta página" | Arriba, después del resumen. Define narrativa, apoya / rechaza ("apoya: el comentario afirma la idea; rechaza: la niega"), fecha de origen y grupo coordinado. |
+| 2. Nombres legibles | Narrativas: sus dos palabras más características ("Foto y campaña", "Líneas y barrios"). Grupos: "Operación A, B, C" (por tamaño) con sus rasgos ("25 cuentas recién creadas, de madrugada"). El código (`n13`, `g03`) queda chico al lado. |
+| 3. Título y frases clave | El título se rotula "Frase representativa". Términos clave: una sola palabra, sin palabras vacías, sin variantes de la misma palabra ("mina"/"minera"), con tildes, máximo 4, y solo los que aparecen en al menos el 8% de los comentarios de la narrativa. |
+| 4. Una sola línea de tiempo | Reemplaza los mini gráficos. Arriba, un punto por narrativa nueva (amarillo, con nombre y fecha) y un punto con la cantidad de las que ya circulaban; al medio, el volumen total; abajo, un carril por grupo. Una línea punteada baja de cada narrativa nueva hasta los carriles. |
+| 5. Apoya / rechaza como estimación | Rotulado "estimación" en el encabezado y en la caja. Cada narrativa lleva una etiqueta de confianza (alta, media, baja) con el indicio que decidió, y una nota al pie de la tabla. |
+| 6. Actividad de cobertura | "Comentarios comunes, sobre cualquier tema, que estas cuentas hacen para parecer usuarios normales y pasar desapercibidas." |
+| 7. Temas | Sí se pudo derivar: dos narrativas son del mismo tema si se discuten en las mismas publicaciones. El nombre del tema sale de las palabras más distintivas de los titulares. |
+| 8. Pie: ruido | "Se aplica una regla observada en los datos de práctica: a los comentarios de ruido nadie les responde... Si un set no cumple esa regla, esta parte pierde precisión." |
+| Diseño | Texto base de 17 px, títulos de 26 a 38 px, resumen en bloque oscuro, un color por tema y otro por grupo, tablas con columnas fijas, más aire. |
+
+Además: si la corrida tuvo alertas (set sin respuestas, tope de seguridad), el reporte las muestra arriba en rojo.
+
+## Cosas que conviene saber del reporte
+
+- **Los nombres automáticos son descriptivos, no lindos.** En práctica salen bien la mayoría ("Agua y mina", "Boleto y aumento", "Regalías y litio"), pero algunos son flojos: "Obra y avanza", "Derrame y compartir", y el tema "Tolar y proyecto" (es el del litio; el titular más distintivo nombra el lugar). Como no se puede escribir nada a mano sobre el set final, es lo que hay: para la demo, apoyarse en la frase representativa.
+- **La confianza de la postura es un criterio mío, no una probabilidad medida.** Sale del mismo puntaje con que el pipeline decide qué bando apoya. En práctica marca "baja" 4 narrativas y la que está realmente al revés (licitación) es una de esas 4; las de confianza alta y media están todas bien. Es una sola comprobación, sobre 13 narrativas.
+- **La frase representativa de una narrativa con la postura al revés es la del bando equivocado.** Pasa con la de licitación: muestra "Nadie quiere venir a dar el servicio acá, no es negocio", que es la respuesta y no la afirmación. Tiene etiqueta de confianza baja.
+- **Los temas dependen de que cada publicación sea de un solo tema.** En práctica es así y salen 3 temas limpios, también en la segunda mitad y en una muestra de 20.000. Si en el set final las publicaciones mezclaran temas, todas las narrativas quedarían en un solo tema y el reporte muestra "Todas las narrativas" sin agrupar (es lo que hace hoy con el set sin respuestas).
+- **Para guardar la confianza agregué dos columnas a la tabla `res_narrativas` de la base** (`puntaje_postura`, `indicio_postura`). No van a `narrativas.csv`, que sigue con sus cuatro columnas.
+
+## Cómo lo revisé
+
+- El navegador sin interfaz que usé ayer dejó de funcionar (le falta su Chromium), así que tomé las capturas con Edge en modo sin interfaz y las miré por partes: cabecera, línea de tiempo, tablas por tema, tarjetas y pie.
+- Arreglé lo que vi mal: etiquetas encimadas en la línea de tiempo, un tema mal nombrado porque un titular se repetía mucho, un término raro ("firmaron"), columnas desalineadas entre temas y "El otro 0% es cobertura".
+- Lo generé también sobre la segunda mitad, una muestra de 20.000 y el set sin respuestas: no se rompe y los nombres salen razonables.
+- **No lo vi proyectado ni en otro navegador.** Antes de la demo conviene abrirlo en la máquina y el proyector que se van a usar.
+

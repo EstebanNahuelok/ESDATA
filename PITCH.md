@@ -46,14 +46,16 @@ cuentas, no con pares sueltos.
 Abrir `reporte/entrega.html` **[VIERNES]** (hoy: `reporte/practica.html`). Recorrido:
 
 1. **Arriba, la respuesta en una frase**: cuántas narrativas, cuántas nuevas, cuántas cuentas coordinadas.
-   Leer en voz alta una de las líneas de hallazgos. En práctica: *"g03, 25 cuentas, originó la narrativa del
-   hospital para la foto, que apareció el domingo 6 a la 1:12 de la mañana."*
-2. **La tabla**: señalar una narrativa "nueva", su fecha de origen y la línea de tiempo donde se ve que nace
-   de golpe. Señalar las barras de color: son los comentarios del grupo que la empuja.
-3. **Una tarjeta de grupo**: cuentas creadas días antes, actúan de madrugada, en ráfagas, repitiendo tres
+   Leer en voz alta una de las líneas de hallazgos. En práctica: *"Operación C, 25 cuentas recién creadas, de
+   madrugada, originó la narrativa Foto y campaña, que apareció el domingo 6 a la 1:12 de la mañana."*
+2. **La línea de tiempo**: los puntos amarillos son las narrativas que nacieron durante el período. Seguir con el
+   dedo la línea punteada de una hacia abajo: cae justo sobre la primera ráfaga de un grupo. Ese grupo la originó.
+3. **Las narrativas por tema**: mostrar un tema, una narrativa "nueva", su frase representativa y la barra
+   apoya / rechaza. Decir que es una estimación y señalar la etiqueta de confianza.
+4. **Una tarjeta de grupo**: cuentas creadas días antes, actúan de madrugada, en ráfagas, repitiendo tres
    frases. Y la otra, la difícil: cuentas viejas, textos variados, horario normal. Esa no se ve mirando una
    cuenta sola; se ve porque siempre aparecen juntas.
-4. Volver a la terminal: **un comando**, y al final dice "Validación OK".
+5. Volver a la terminal: **un comando**, y al final dice "Validación OK".
 
 ### 5. Resultados y costo (30 segundos)
 

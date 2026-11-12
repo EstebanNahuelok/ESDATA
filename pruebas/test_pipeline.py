@@ -288,7 +288,9 @@ class MuestraPracticaTest(Base):
         con_narrativa = sum(1 for c in leer(primera / "comentarios.csv") if c["narrativa"] not in ("", "ninguna"))
         self.assertGreater(con_narrativa, self.N // 2)
         html = (self.tmp / "a.html").read_text(encoding="utf-8")
-        self.assertIn("1 · Narrativas", html)
+        self.assertIn("Cómo leer esta página", html)
+        self.assertIn("Frase representativa", html)
+        self.assertIn("class='tema-t'", html)
         self.assertIn("<svg", html)
 
 

@@ -79,9 +79,11 @@ python -m pipeline.validar --entrega entrega --datos datos/final
 ### Reporte visual
 
 Cada corrida genera además **un archivo HTML estático** (`reporte/<nombre de la carpeta de entrega>.html`; para el
-set final, `reporte/entrega.html`). Se abre con doble clic, no necesita internet ni servidor, y muestra en una
-pantalla: las narrativas con su fecha de origen y su línea de tiempo, cuánto se apoya y se rechaza cada una, y
-los grupos de cuentas coordinadas con qué narrativa empujan, cuándo y a qué hora actúan y qué repiten.
+set final, `reporte/entrega.html`). Se abre con doble clic, no necesita internet ni servidor, y muestra:
+un resumen en una frase, una caja "cómo leer esta página", una línea de tiempo con el origen de cada narrativa
+nueva y la actividad de cada grupo coordinado, las narrativas agrupadas por tema (con su frase representativa,
+apoya / rechaza como estimación con su nivel de confianza, y quién la empuja) y una tarjeta por grupo.
+Los nombres de narrativas, temas y grupos se derivan de los datos; no hay nada escrito a mano.
 El del set de práctica está en [`reporte/practica.html`](reporte/practica.html).
 
 Se arma con consultas SQL sobre la base DuckDB, así que se puede regenerar sin volver a procesar nada:
