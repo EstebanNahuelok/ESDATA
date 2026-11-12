@@ -742,3 +742,15 @@ Además: si la corrida tuvo alertas (set sin respuestas, tope de seguridad), el 
 - Lo generé también sobre la segunda mitad, una muestra de 20.000 y el set sin respuestas: no se rompe y los nombres salen razonables.
 - **No lo vi proyectado ni en otro navegador.** Antes de la demo conviene abrirlo en la máquina y el proyector que se van a usar.
 
+
+---
+
+# Jueves 12, 16:09: primer push al repo del equipo
+
+- Remotos: el de la organización pasó a llamarse `qualydata` (solo lectura) y `origin` ahora es https://github.com/EstebanNahuelok/ESDATA.git.
+- Revisión antes de subir: `.gitignore` ya cubría `.venv/`, `salida/` (incluye `salida/verificacion/`, 750 MB), `almacen/`, `datos/final/` y `__pycache__/`. **Faltaba `.env`**: lo agregué, junto con `.env.*` y `*.duckdb`. `entrega/` y `reporte/` no están ignorados.
+- Lo que se sube: 39 archivos, 5,8 MB (el más grande es `datos/practica/comentarios.csv.gz`, 4,7 MB, de la organización). En ningún commit hubo archivos de `.venv`, `salida`, `almacen`, `datos/final`, bases DuckDB ni `.env`.
+- Claves y secretos: busqué en todos los commits de todas las ramas patrones de claves (OpenAI, Groq, Google, GitHub, AWS, Slack, claves privadas, `clave=valor` largos) y rutas o usuarios de la máquina. Sin coincidencias. No existe ningún `.env` en el disco.
+- Push de `main` y de `nucleo-pipeline`, sin forzar. El repo estaba vacío. Desde ahora, push después de cada commit.
+- **Pendiente importante:** `main` en el repo solo tiene el material original de la organización. Todo el trabajo está en `nucleo-pipeline`. Quien entre al repo o lo clone ve `main` por defecto, así que antes de la entrega hay que unir la rama a `main`.
+- `CLAUDE.md` sigue sin versionar y no se subió.
