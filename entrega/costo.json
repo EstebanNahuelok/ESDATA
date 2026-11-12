@@ -1,0 +1,83 @@
+{
+  "comentarios_procesados": 150000,
+  "segundos": 22.6,
+  "tokens_ia": 0,
+  "usd_ia": 0.0,
+  "usd_por_mil_comentarios": 0.0,
+  "hardware": "notebook, Intel(R) Core(TM) i7-10510U CPU @ 1.80GHz (4 núcleos, 8 hilos), 8 GB de RAM, sin GPU (todo corre en CPU), Windows 10",
+  "almacenamiento": "DuckDB local, un solo archivo de 26.3 MB (almacen/final.duckdb) con las tablas limpias y los resultados; entrada 3.4 MB en CSV comprimido, entrega 2.9 MB en CSV",
+  "notas": "Sin IA generativa ni servicios externos: TF-IDF sobre textos únicos, agrupamiento por lotes y grafos, todo en CPU. Memoria pico del proceso: 569 MB.",
+  "memoria_pico_mb": 569,
+  "comentarios_por_segundo": 6627,
+  "almacenamiento_mb": {
+    "entrada_csv": 3.4,
+    "base_duckdb": 26.3,
+    "entrega_csv": 2.9
+  },
+  "etapas": {
+    "ingesta": {
+      "segundos": 5.98,
+      "memoria_mb": 185,
+      "pico_mb": 247
+    },
+    "narrativas": {
+      "segundos": 5.34,
+      "memoria_mb": 246,
+      "pico_mb": 374
+    },
+    "bandos": {
+      "segundos": 0.02,
+      "memoria_mb": 248,
+      "pico_mb": 374
+    },
+    "coordinacion": {
+      "segundos": 7.16,
+      "memoria_mb": 230,
+      "pico_mb": 569
+    },
+    "postura": {
+      "segundos": 0.17,
+      "memoria_mb": 234,
+      "pico_mb": 569
+    },
+    "origen_y_titulos": {
+      "segundos": 0.06,
+      "memoria_mb": 236,
+      "pico_mb": 569
+    },
+    "escritura": {
+      "segundos": 0.38,
+      "memoria_mb": 230,
+      "pico_mb": 569
+    },
+    "validacion": {
+      "segundos": 1.96,
+      "memoria_mb": 225,
+      "pico_mb": 569
+    },
+    "reporte": {
+      "segundos": 0.96,
+      "memoria_mb": 215,
+      "pico_mb": 569
+    }
+  },
+  "semilla": 0,
+  "versiones": {
+    "python": "3.13.3",
+    "duckdb": "1.5.6",
+    "numpy": "2.5.4",
+    "scipy": "1.18.1",
+    "scikit-learn": "1.9.1",
+    "networkx": "3.7",
+    "pandas": "3.1.1"
+  },
+  "parametros_cambiados": {},
+  "tope_coordinacion": {
+    "activado": false,
+    "tope_cuentas": 600,
+    "tope_fraccion": 0.05,
+    "marcadas_inicial": 98,
+    "pasos": [],
+    "bajo_el_tope": true
+  }
+}

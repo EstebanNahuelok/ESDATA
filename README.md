@@ -31,9 +31,37 @@ memoria pico, base de **35 MB**, **0 tokens de IA, 0 USD**, en una notebook con 
 Ese número es del set de práctica; el set final trae otros temas y otras campañas, y abajo decimos con
 honestidad qué puede fallar.
 
+## Resultado en el set final
+
+La carpeta [`entrega/`](entrega/) es la salida del comando de abajo sobre el set final (150.000 comentarios, 12.002
+cuentas, 372 publicaciones), sin tocar nada a mano. El set final no trae respuesta correcta, así que acá no hay
+puntaje: solo lo que el pipeline encontró.
+
+| | Set final |
+|---|---|
+| Narrativas | 12, sobre 3 temas; 3 aparecen durante el período |
+| Ruido | 20,7% de los comentarios |
+| Cuentas coordinadas | 98 de 12.002 (0,8%), en 3 grupos de 46, 30 y 22 cuentas |
+| Tiempo y memoria | 22,6 s, 569 MB de pico |
+| Almacenamiento | base DuckDB de 26,8 MB; entrada 3,4 MB, entrega 2,9 MB |
+| IA | 0 tokens, 0 USD |
+| Validación y alertas | formato OK; ninguna alerta; el tope de seguridad no se activó |
+
+El reporte visual de esa corrida está en [`reporte/entrega.html`](reporte/entrega.html).
+
+**Para volver a correrlo y comparar.** Tres corridas (dos con el entorno de `requirements-lock.txt` y una con
+versiones más viejas de las librerías) dieron los tres CSV idénticos byte a byte. `costo.json` cambia entre
+corridas porque trae el tiempo y la memoria medidos. SHA-256 de lo entregado:
+
+```
+172345b4fabac08473cdaec178ed3b4895a9b9ecfc26a2c4ea5fe0abcdabffcc  entrega/comentarios.csv
+417e124ffae240a248d999ca9a8fef5d91f7c20f27b63de4e3c8904ca90ad944  entrega/cuentas.csv
+4db7053782dbded21839793ea515bc98de03cee242ad6648edf8dffb21e7f489  entrega/narrativas.csv
+```
+
 ## Cómo correrlo
 
-Requisitos: Python 3.10 o superior (lo probamos con 3.13 en Windows). No hace falta GPU, ni internet después de instalar.
+Requisitos: **Python 3.13** (probado con 3.13.3 en Windows 10). No hace falta GPU, ni internet después de instalar.
 
 ```bash
 python -m venv .venv
@@ -44,7 +72,18 @@ source .venv/bin/activate        # en Windows: .venv\Scripts\activate
 ```
 
 ```bash
-pip install -r requirements.txt
+pip install -r requirements-lock.txt
+```
+
+`requirements-lock.txt` trae las versiones exactas con las que se generó la entrega. Con otra versión de Python,
+`pip install -r requirements.txt` instala las mismas librerías por rangos de versiones.
+
+El set final se baja a `datos/final/` (no se versiona), desde la raíz del repo:
+
+```bash
+mkdir -p datos/final && cd datos/final
+for f in fuentes.csv publicaciones.csv.gz comentarios.csv.gz cuentas.csv.gz; do curl -LO https://github.com/qualydata-org/desafio-qualydata/releases/download/set-final/$f; done
+cd ../..
 ```
 
 **Un solo comando, de punta a punta**, sobre el set final:
@@ -52,6 +91,9 @@ pip install -r requirements.txt
 ```bash
 python -m pipeline.run --datos datos/final --entrega entrega
 ```
+
+No hay nada al azar sin fijar: la semilla es 0 por defecto (`--semilla`) y corridas en procesos distintos dan
+los mismos archivos.
 
 Sobre el set de práctica, y para medirlo:
 
@@ -120,10 +162,9 @@ Pruebas automáticas (24 pruebas, unos 45 segundos):
 python -m unittest discover -s pruebas
 ```
 
-`requirements.txt` trae rangos de versiones. Lo probamos desde cero en un entorno virtual nuevo con las versiones
-más recientes (las exactas están en `requirements-lock.txt`) y también con versiones de 2025
-(pandas 2.2, numpy 2.2, scikit-learn 1.6, networkx 3.4): los archivos de salida son idénticos byte a byte.
-Para reproducir exactamente nuestro entorno: `pip install -r requirements-lock.txt`.
+Lo probamos desde cero (clonar el repo de GitHub, entorno virtual nuevo, instalar, correr) con las versiones de
+`requirements-lock.txt` y también con versiones de 2025 (pandas 2.2, numpy 2.2, scikit-learn 1.6, networkx 3.4):
+los archivos de salida son idénticos byte a byte, en el set de práctica y en el set final.
 
 ### Datos sucios o incompletos
 
@@ -297,7 +338,7 @@ Para no engañarnos con un puntaje casi perfecto hicimos tres cosas, todas repro
 pipeline/        nuestro código (un módulo por etapa; entrada: python -m pipeline.run)
 pruebas/         pruebas mínimas (formato, datos sucios, reproducibilidad)
 verificacion/    sensibilidad, generalización, escala y ejemplos (usan la verdad de práctica; no son parte del pipeline)
-entrega/         resultado del set final (se genera el viernes 13)
+entrega/         resultado del set final (los 4 archivos que se puntúan)
 reporte/         reporte visual en HTML de cada corrida
 evaluacion/      evaluador oficial (de la organización)
 ejemplos/        línea base (de la organización)

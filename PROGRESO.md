@@ -822,3 +822,72 @@ Script nuevo: `verificacion/sintetico_millon.py`. No toca el pipeline.
 - **Probado con una sola copia** (200.000 comentarios con ids cambiados): 39,6 s, 630 MB, 54,56 / 55, igual que el set original. Revisé también con dos copias que ids, respuestas, fechas y campañas queden bien armados (sin correr el pipeline).
 - **Por qué no corrí el millón todavía:** la tabla de escala proyecta unos 2,5 GB de memoria para un millón, y la notebook tenía entre 0,6 y 1,6 GB libres (editor, Brave, Discord y el agente abiertos; 3,2 GB ya en el archivo de paginación). Así, lo más probable es que la máquina se ponga muy lenta y que el vigilante corte la corrida antes de terminar, gastando el único intento. Queda esperando que Esteban cierre lo que pueda y dé el visto bueno.
 - Para correrlo: `python verificacion/sintetico_millon.py` (y `--tabla` para ver el resultado).
+
+
+---
+
+# Jueves 12, 19:40 a 20:30: corrida del set final y entrega de seguridad
+
+## Qué cambió en el enunciado
+
+Entre nuestro `DESAFIO.md` y el README actual de la organización cambian 5 líneas (commits `ec1d585` y `8cbe921`). `DESAFIO.md` ya está actualizado.
+
+| Tema | Antes | Ahora |
+|---|---|---|
+| Publicación del set final | "El viernes 13 se publica el set final." | "El jueves 12 a las 17 se publica el set final en Releases [...]. Descarguen los cuatro archivos en `datos/final/`". |
+| Cierre | "antes del cierre" (sin hora) | "Commiteen y pusheen `entrega/` y el código que la generó antes del cierre: viernes 13 a las 13." (un commit anterior decía las 10; lo extendieron). |
+| Re-ejecución | "el jurado puede volver a correrlo" | "No se permite etiquetar a mano el set final ni editar a mano la entrega. A los equipos del podio el jurado les vuelve a correr ese comando sobre el set final: si el resultado no se parece al entregado, quedan afuera. Fijen las semillas aleatorias; si usan IA, se aceptan diferencias menores." |
+| Calendario | set final el viernes a la mañana | jueves a las 17 set final; viernes "Cierre a las 13". |
+
+No cambió nada del formato de entrega, del puntaje ni del evaluador (`evaluacion/puntuar.py` es el mismo archivo). El texto del release agrega que se vuelve a correr "el comando de su README".
+
+## Descarga
+
+Los cuatro archivos del release `set-final` están en `datos/final/` (ignorado por git) y sus SHA-256 coinciden con los publicados. Las columnas son las mismas que en práctica, en el mismo orden. 150.000 comentarios, 12.002 cuentas, 372 publicaciones, 8 fuentes, 10 días (5 al 14 de octubre), 13,8% de respuestas, sin ids repetidos ni vacíos.
+
+## Corrida
+
+`python -m pipeline.run --datos datos/final --entrega entrega`, con el entorno de `requirements-lock.txt` (Python 3.13.3). Con 1,6 GB de RAM libre (editor y navegador abiertos).
+
+- Validación: OK. Controles de cordura: sin alertas. Tope de seguridad: no se activó.
+- 12 narrativas (la mayor, 17.198 comentarios; la menor, 2.336). 3 temas en el reporte: seguridad, dique, festival.
+- Ruido: 20,7% (31.114 comentarios).
+- 98 cuentas coordinadas de 12.002 (0,82%), en 3 grupos de 46, 30 y 22.
+- 22,6 s, 569 MB de pico. Base de 26,8 MB.
+
+## Qué vi al revisar (sin tocar nada)
+
+Lo que se ve bien:
+
+- **Narrativas:** las 12 son ideas distintas y cada una tiene sus dos bandos. Leyendo las frases más repetidas de cada bando no vi ninguna con la postura claramente al revés; 4 tienen confianza alta y 8 media.
+- **Ruido:** son reacciones, preguntas de logística y avisos ("Comparto", "Qué esquina es?", "Sorteo en mi perfil!!").
+- **Los tres grupos tienen forma de operación:** g02 son 46 cuentas creadas entre el 27/9 y el 1/10 que repiten consignas a favor del dique en ráfagas; g01 son 30 cuentas viejas que se responden entre sí ("Exacto, pan y circo") contra el festival; g03 son 22 cuentas creadas entre el 3 y el 7/10 que de madrugada lanzan el rumor del cierre de la comisaría. La fecha de origen de esa narrativa (9/10, 01:41) coincide con el primer comentario de g03.
+- Busqué cuentas no marcadas que se parezcan a los grupos (respuestas a miembros, coincidencias con 5 o más miembros): para g01 y g03 no aparece ninguna.
+
+Lo que se ve raro:
+
+1. **Faltan 4 cuentas de g02, casi seguro.** En el set hay 50 cuentas creadas entre el 27/9 y el 1/10 (después de julio no hay ninguna otra cuenta nueva genuina): 46 están marcadas y 4 no (`u001834`, `u002867`, `u007143`, `u007666`). Las 4 publican las mismas consignas en las mismas ráfagas.
+2. **Las consignas de las campañas quedaron mal ubicadas.** La campaña del dique usa 5 consignas casi iguales ("Sí a la obra: el dique es agua para la ciudad y para el riego", "Queremos el dique: ...") y solo una quedó donde corresponde (narrativa del dique, apoya). Tres quedaron en la narrativa del sobreprecio de la obra (dos como "apoya" y una como "rechaza") y una como ruido. En g03, tres de sus cuatro redacciones del rumor quedaron como ruido. Son unos 290 comentarios, el 0,2% del set.
+   - Por qué pasa: son frases que casi solo dice la campaña y a las que casi nadie les contesta. El pipeline ubica cada familia de frases por sus respuestas, y con 0 a 5 respuestas la ubicación es casi al azar; con cero, la regla de ruido la manda a ruido.
+   - Consecuencia en el reporte: dice que la Operación A "empuja la narrativa Obra y sobreprecio, apoyándola", cuando en realidad empuja el dique. Es el error más visible para una demo.
+   - Esto explica también el punto 1: como las consignas quedaron repartidas en 4 celdas distintas, ninguna celda queda "dominada" por el grupo y la segunda pasada no suma a las cuentas con pocos comentarios.
+3. **Detalle menor:** "no" aparece como frase clave de n01, y algunas frases clave mezclan palabras de los dos bandos ("comisaria|cierra|falso").
+
+Cuánto pesa: el punto 2 casi no mueve el puntaje automático (0,2% de los comentarios). El punto 1, si las 4 cuentas son de la campaña, cuesta unos 0,3 a 0,4 puntos de 55.
+
+## Cambios generales que propondría (NO aplicados)
+
+- **A. Ubicar por palabras las familias de frases con pocas respuestas.** Si una familia de frases tiene muy pocos enlaces de conversación, decidir su narrativa y su bando por la familia bien conectada más parecida en palabras, y no mandarla a ruido si se parece a una narrativa. Arreglaría el punto 2 y probablemente el 1.
+- **B. En coordinación, sumar la señal "misma frase".** Una cuenta que publica las frases casi exclusivas de un grupo, en sus mismas ráfagas, se suma al grupo. Arreglaría el punto 1 aunque no se haga A.
+- Los dos tocan el núcleo. Habría que medirlos en práctica y en los nueve recortes antes de volver a correr el set final, y no aplicarlos si cambian el resultado de práctica para peor.
+
+## Reproducibilidad
+
+- Semillas: `np.random.seed(semilla)` al empezar y `seed=semilla` en Louvain, que es lo único con azar; por defecto 0.
+- Tres corridas sobre `datos/final`, en procesos distintos: dos con el entorno del lock y una con el Python global (numpy 2.2.5, pandas 2.2.3, scipy 1.15.2, scikit-learn 1.6.1, networkx 3.4.2). `comentarios.csv`, `narrativas.csv` y `cuentas.csv` idénticos byte a byte en las tres. `costo.json` cambia en los segundos y la memoria.
+- README: instalar con `requirements-lock.txt`, Python 3.13 (probado con 3.13.3), cómo bajar el set final y los SHA-256 de los tres CSV entregados.
+- `.gitattributes`: los archivos de `entrega/` se guardan tal cual, sin conversión de fin de línea, para que los SHA-256 coincidan en cualquier clon.
+
+## Entrega de seguridad
+
+`entrega/` (4 archivos) y `reporte/entrega.html` commiteados y pusheados a `main` y `nucleo-pipeline`. Si después se mejora algo, se vuelve a correr y se actualiza.
