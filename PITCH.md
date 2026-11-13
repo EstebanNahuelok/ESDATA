@@ -118,7 +118,7 @@ encontramos las 115 cuentas coordinadas sin un solo falso positivo. Costo: cero 
 
 - **Decidir cuál bando "apoya" es lo más flojo.** Separamos bien los dos bandos de cada narrativa, pero
   decidir cuál sostiene la afirmación y cuál la niega es un problema de significado. En práctica erramos 1 de
-  13 narrativas. Una sola llamada a un modelo de lenguaje, con unas 300 frases, lo resolvería por centavos.
+  13 narrativas.  Una sola llamada a un modelo de lenguaje, con unas 300 frases, lo resolvería por centavos.
   Elegimos no usar IA.
 - **Depende de que haya respuestas.** Si nadie le contesta a nadie, caemos a agrupar por palabras, que rinde
   como la línea base.
