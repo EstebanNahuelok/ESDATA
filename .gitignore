@@ -10,3 +10,4 @@ almacen/
 *.duckdb
 *.duckdb.wal
 reporte/*.html
+reporte/*.png
