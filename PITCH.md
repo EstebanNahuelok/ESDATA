@@ -108,7 +108,7 @@ encontramos las 115 cuentas coordinadas sin un solo falso positivo. Costo: cero 
 - 26 pruebas automáticas: archivos faltantes, columnas faltantes, fechas rotas, duplicados, hilos circulares,
   otra codificación, set vacío.
 - El pipeline valida su propia entrega contra el formato del enunciado antes de terminar.
-- Lo que tuvo que descartar o suponer queda escrito en `costo.json`.
+- Lo que tuvo que descartar  o suponer queda escrito en `costo.json`.
 
 **Claridad y visualización (10 puntos)**
 
