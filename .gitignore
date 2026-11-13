@@ -9,3 +9,4 @@ almacen/
 .env.*
 *.duckdb
 *.duckdb.wal
+reporte/*.html
