@@ -1,7 +1,8 @@
 """Reporte visual: un solo archivo HTML estático, sin internet ni JavaScript, generado desde la base DuckDB.
 
-Responde en una pantalla: qué narrativas circulan, desde cuándo, quién las apoya o rechaza y qué grupos
-de cuentas coordinadas las empujan. El pipeline lo genera al final; también se puede regenerar suelto:
+Por defecto genera el dashboard de una pantalla con pestañas (Resumen / Línea de tiempo / Narrativas /
+Operaciones, negro + violeta, con modo claro) definido en pipeline/reporte_dashboard.py; con --informe genera el informe
+largo anterior, pensado para leer en vez de mirar en pantalla:
 
     python -m pipeline.reporte --base almacen/practica.duckdb --salida reporte/practica.html --costo salida/practica/costo.json
 
@@ -627,7 +628,17 @@ def _html(d: dict, nombre: str, costo: dict) -> str:
 
 
 def generar_reporte(base, salida, costo: dict = None, nombre: str = None) -> Path:
-    """Lee la base DuckDB (solo lectura) y escribe el HTML. Devuelve la ruta escrita."""
+    """Escribe el dashboard definitivo (pestañas, estilo Briefing). Devuelve la ruta escrita.
+
+    La implementación vive en pipeline/reporte_dashboard.py; el import es diferido porque ese
+    módulo a su vez importa reunir_datos() de acá.
+    """
+    from .reporte_dashboard import generar_dashboard
+    return generar_dashboard(base, salida, costo, nombre or Path(base).stem)
+
+
+def generar_informe(base, salida, costo: dict = None, nombre: str = None) -> Path:
+    """Versión anterior: informe largo para leer (una columna, con metodología)."""
     salida = Path(salida)
     con = duckdb.connect(str(base), read_only=True)
     try:
@@ -644,9 +655,10 @@ def main(argv=None):
     ap.add_argument("--base", type=Path, required=True, help="Archivo DuckDB que dejó el pipeline")
     ap.add_argument("--salida", type=Path, required=True, help="Archivo HTML a escribir")
     ap.add_argument("--costo", type=Path, default=None, help="costo.json de la corrida (opcional)")
+    ap.add_argument("--informe", action="store_true", help="Generar el informe largo anterior en vez del dashboard")
     args = ap.parse_args(argv)
     costo = json.loads(args.costo.read_text(encoding="utf-8")) if args.costo and args.costo.is_file() else {}
-    ruta = generar_reporte(args.base, args.salida, costo)
+    ruta = (generar_informe if args.informe else generar_reporte)(args.base, args.salida, costo)
     print(f"Reporte en {ruta} ({ruta.stat().st_size // 1024} KB)")
 
 
