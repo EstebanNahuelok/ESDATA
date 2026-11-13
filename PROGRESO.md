@@ -962,3 +962,29 @@ Lo que NO se arregló:
 - **"Sí a la obra!" (14 comentarios)** pasa a la narrativa del dique pero queda como "rechaza". Esa frase quedó dentro de una familia de frases de otra narrativa, y A trabaja por familia entera.
 - **Las tres redacciones del rumor de g03 que quedaron como ruido (60 comentarios)** siguen como ruido, por lo mismo: están dentro de una familia de ruido más grande, no en una familia propia.
 - "no" como frase clave de n01 (no se tocó).
+
+
+---
+
+# Viernes 13, 03:00 a 03:15: A+B aprobado, unido a `main`, verificación final y código congelado
+
+- **Unión:** `mejora-ab` pasó a `main` y a `nucleo-pipeline` por avance rápido (commit `81cde32`), pusheado sin forzar. La etiqueta `entrega-segura` sigue en `4d53fde` (la entrega anterior, de respaldo).
+- **Verificación final desde cero**, en una carpeta nueva (`C:\PROYECTOS\verificacion-final-esdata`):
+  1. `git clone` del repo público: baja `main` en `81cde32`. Los tres CSV de `entrega/` bajan con los mismos SHA-256 que figuran en el README.
+  2. Entorno virtual nuevo, `pip install -r requirements-lock.txt`: sin errores, Python 3.13.3, mismas versiones que el lock.
+  3. Set final bajado con el fragmento del README; los cuatro SHA-256 coinciden con los del release.
+  4. `python -m pipeline.run --datos datos/final --entrega entrega`: validación OK, sin alertas, 12 narrativas, 20,7% de ruido, 102 cuentas en grupos de 50, 30 y 22. 27,4 s, 567 MB.
+  5. Los tres CSV recién generados son idénticos byte a byte a los que venían en el repo, a los que se descargan de GitHub (rama `main`) y a los SHA-256 del README. Después de correr, en el clon solo cambian `entrega/costo.json` y `reporte/entrega.html` (traen tiempo, memoria y fecha).
+- **En GitHub, rama `main`:** `entrega/` tiene `comentarios.csv`, `costo.json`, `cuentas.csv` y `narrativas.csv`; `reporte/entrega.html` está. El repo es público y `main` es la rama por defecto.
+- **`PITCH.md`:** completados los pendientes del set final con los números de la entrega (150.000 comentarios, 12 narrativas, 20,7% de ruido, 102 cuentas en 3 grupos de 50, 30 y 22, 22,2 s, 567 MB) y el guion de demo con frases del reporte del set final.
+- **Código congelado.** Desde acá no se toca `pipeline/`. Si se vuelve a correr el comando, `costo.json` y el reporte cambian en tiempo y fecha; los CSV no.
+
+SHA-256 de la entrega final:
+
+```
+904fa8f7eed75d7a9cf0fde09429c09e4bd1e55f011dcf6529572bd526ab9b54  entrega/comentarios.csv
+f7edca5224afc5a5f2c8a9fcd39657f08af561b35d84ad7be5071c7dd6d96557  entrega/cuentas.csv
+4db7053782dbded21839793ea515bc98de03cee242ad6648edf8dffb21e7f489  entrega/narrativas.csv
+```
+
+Pendiente (no es código): video de demo, carga en Hacki antes del viernes 13 a las 13:00, ensayo del pitch, abrir el reporte en la máquina de la demo. La prueba sintética de un millón quedó sin correr (script listo en `verificacion/sintetico_millon.py`); el README sigue diciendo que no hay una corrida medida con millones.

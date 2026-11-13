@@ -1,7 +1,8 @@
 # PITCH — borrador
 
-Borrador para un pitch de 3 minutos más demo. Los números son del **set de práctica**; lo marcado con
-**[VIERNES]** se completa con la corrida del set final. Está escrito para decirlo en voz alta: frases cortas.
+Borrador para un pitch de 3 minutos más demo. Los números son del **set de práctica**, salvo donde dice
+**set final**: esos salen de la corrida entregada (`entrega/costo.json` y `reporte/entrega.html`). Está escrito
+para decirlo en voz alta: frases cortas.
 
 ## La frase
 
@@ -43,11 +44,13 @@ cuentas, no con pares sueltos.
 
 ### 4. Demo (60 segundos)
 
-Abrir `reporte/entrega.html` **[VIERNES]** (hoy: `reporte/practica.html`). Recorrido:
+Abrir `reporte/entrega.html` (set final). Recorrido:
 
-1. **Arriba, la respuesta en una frase**: cuántas narrativas, cuántas nuevas, cuántas cuentas coordinadas.
-   Leer en voz alta una de las líneas de hallazgos. En práctica: *"Operación C, 25 cuentas recién creadas, de
-   madrugada, originó la narrativa Foto y campaña, que apareció el domingo 6 a la 1:12 de la mañana."*
+1. **Arriba, la respuesta en una frase**: *"En 150.000 comentarios circulan 12 narrativas sobre 3 temas; 3
+   aparecieron durante el período. 102 cuentas (0,8% del total) actúan coordinadas en 3 grupos."*
+   Leer en voz alta una de las líneas de hallazgos: *"Operación C (22 cuentas recién creadas, de madrugada)
+   empuja la narrativa Comisaría y cierra: «Si cierran la comisaría del barrio esto va a ser tierra de nadie.»,
+   que apareció el viernes 9 de octubre a la 1:41."*
 2. **La línea de tiempo**: los puntos amarillos son las narrativas que nacieron durante el período. Seguir con el
    dedo la línea punteada de una hacia abajo: cae justo sobre la primera ráfaga de un grupo. Ese grupo la originó.
 3. **Las narrativas por tema**: mostrar un tema, una narrativa "nueva", su frase representativa y la barra
@@ -61,11 +64,14 @@ Abrir `reporte/entrega.html` **[VIERNES]** (hoy: `reporte/practica.html`). Recor
 
 | | Línea base | Nosotros (práctica) | Set final |
 |---|---|---|---|
-| Puntaje automático | 16,8 / 55 | **54,56 / 55** | **[VIERNES]** no hay verdad: lo mide el jurado |
-| Cuentas coordinadas | 7% de precisión | **115 de 115, sin falsos positivos** | **[VIERNES]** cantidad de cuentas y grupos |
-| Tiempo | — | **27 a 48 s** | **[VIERNES]** |
-| Memoria pico | — | **650 MB** | **[VIERNES]** |
-| Costo en IA | — | **0 tokens, 0 USD** | 0 |
+| Comentarios | 200.000 | 200.000 | 150.000 |
+| Puntaje automático | 16,8 / 55 | **54,56 / 55** | no hay verdad: lo mide el jurado |
+| Narrativas | — | 13 | **12** (3 aparecen durante el período) |
+| Ruido | — | 18,9% | **20,7%** |
+| Cuentas coordinadas | 7% de precisión | **115 de 115, sin falsos positivos** | **102 de 12.002, en 3 grupos (50, 30 y 22)** |
+| Tiempo | — | **27 a 48 s** | **22,2 s** |
+| Memoria pico | — | **650 MB** | **567 MB** |
+| Costo en IA | — | **0 tokens, 0 USD** | **0 tokens, 0 USD** |
 
 Todo corre en una notebook de 8 GB sin GPU. Los datos viven en un archivo DuckDB de 35 MB: sin servidor, sin
 nube, y el jurado lo puede volver a correr con un comando.
@@ -99,7 +105,7 @@ encontramos las 115 cuentas coordinadas sin un solo falso positivo. Costo: cero 
 **Robustez (15 puntos)**
 
 - Un comando de punta a punta. Mismo resultado byte a byte en dos corridas y en dos entornos distintos.
-- 24 pruebas automáticas: archivos faltantes, columnas faltantes, fechas rotas, duplicados, hilos circulares,
+- 26 pruebas automáticas: archivos faltantes, columnas faltantes, fechas rotas, duplicados, hilos circulares,
   otra codificación, set vacío.
 - El pipeline valida su propia entrega contra el formato del enunciado antes de terminar.
 - Lo que tuvo que descartar o suponer queda escrito en `costo.json`.
@@ -152,7 +158,7 @@ la línea base son de la organización y no los tocamos.
 
 ## Para completar el viernes
 
-- [ ] Números del set final: comentarios, narrativas, grupos, cuentas marcadas, segundos, memoria.
+- [x] Números del set final: 150.000 comentarios, 12 narrativas, 20,7% de ruido, 102 cuentas en 3 grupos (50, 30, 22), 22,2 s, 567 MB.
 - [ ] Elegir las dos o tres narrativas y el grupo que se van a mostrar en la demo (mirar el reporte antes).
 - [ ] Capturas del reporte por si falla el proyector.
 - [ ] Ensayar con cronómetro: 3 minutos.
