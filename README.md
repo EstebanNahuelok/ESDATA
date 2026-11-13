@@ -121,11 +121,12 @@ python -m pipeline.validar --entrega entrega --datos datos/final
 ### Reporte visual
 
 Cada corrida genera además **un archivo HTML estático** (`reporte/<nombre de la carpeta de entrega>.html`; para el
-set final, `reporte/entrega.html`). Se abre con doble clic, no necesita internet ni servidor, y muestra:
-un resumen en una frase, una caja "cómo leer esta página", una línea de tiempo con el origen de cada narrativa
-nueva y la actividad de cada grupo coordinado, las narrativas agrupadas por tema (con su frase representativa,
-apoya / rechaza como estimación con su nivel de confianza, y quién la empuja) y una tarjeta por grupo.
-Los nombres de narrativas, temas y grupos se derivan de los datos; no hay nada escrito a mano.
+set final, `reporte/entrega.html`). Se abre con doble clic, no necesita internet, servidor ni JavaScript. Es un
+tablero de una pantalla con cuatro pestañas: **Resumen** (los números principales y los hallazgos),
+**Línea de tiempo** (cuándo apareció cada narrativa nueva y cuándo actuó cada grupo coordinado),
+**Narrativas** (volumen, apoya / rechaza como estimación con su nivel de confianza, y quién la empuja) y
+**Operaciones** (una tarjeta por grupo coordinado). Tiene modo claro y oscuro.
+Los nombres de narrativas y grupos se derivan de los datos; no hay nada escrito a mano.
 El del set de práctica está en [`reporte/practica.html`](reporte/practica.html).
 
 Se arma con consultas SQL sobre la base DuckDB, así que se puede regenerar sin volver a procesar nada:
@@ -133,6 +134,9 @@ Se arma con consultas SQL sobre la base DuckDB, así que se puede regenerar sin 
 ```bash
 python -m pipeline.reporte --base almacen/final.duckdb --salida reporte/entrega.html --costo entrega/costo.json
 ```
+
+Con `--informe`, ese mismo comando genera la versión anterior: un informe largo para leer, con la guía
+"cómo leer esta página" y las narrativas agrupadas por tema.
 
 Es un extra aislado: se genera después de escribir y validar la entrega, y si fallara, la entrega no se ve
 afectada. `--sin-reporte` lo apaga y `--reporte ruta.html` cambia dónde se escribe.

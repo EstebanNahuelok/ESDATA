@@ -51,7 +51,7 @@ class Base(unittest.TestCase):
         entrega = entrega or self.entrega
         correr(self.datos, entrega, self.tmp / f"{entrega.name}.duckdb", reporte=self.tmp / f"{entrega.name}.html")
         html = (self.tmp / f"{entrega.name}.html").read_text(encoding="utf-8")
-        self.assertIn("Qué circula, desde cuándo y quién lo empuja", html)
+        self.assertIn("ESDATA · monitor de narrativas", html)
         self.assertNotIn("http://", html)   # archivo estático: sin recursos externos
         self.assertNotIn("https://", html)
         return entrega
@@ -333,9 +333,9 @@ class MuestraPracticaTest(Base):
         con_narrativa = sum(1 for c in leer(primera / "comentarios.csv") if c["narrativa"] not in ("", "ninguna"))
         self.assertGreater(con_narrativa, self.N // 2)
         html = (self.tmp / "a.html").read_text(encoding="utf-8")
-        self.assertIn("Cómo leer esta página", html)
-        self.assertIn("Frase representativa", html)
-        self.assertIn("class='tema-t'", html)
+        for pestana in ("Resumen", "Línea de tiempo", "Narrativas", "Operaciones"):
+            self.assertIn(pestana, html)
+        self.assertIn("class='vista'", html)
         self.assertIn("<svg", html)
 
 

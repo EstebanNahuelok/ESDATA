@@ -366,9 +366,13 @@ def _vistas(d, c, pal) -> str:
                + f"<section class='panel'><div class='ph'>Composición</div><div class='pb'>{_chart_donut(d, c, pal)}</div></section>"
                + f"<section class='panel'><div class='ph'>Postura global</div><div class='pb'>{_chart_postura(d, pal)}</div></section>"
                + "</div>")
-    timeline = (f"<section class='panel'><div class='ph'>Aparición de narrativas y actividad coordinada"
-                f"<span>cada barra = {d['cubeta'] // 3600} h</span></div>"
-                f"<div class='pb'>{_chart_timeline(d, pal)}</div></section>")
+    if d.get("cubeta"):
+        timeline = (f"<section class='panel'><div class='ph'>Aparición de narrativas y actividad coordinada"
+                    f"<span>cada barra = {d['cubeta'] // 3600} h</span></div>"
+                    f"<div class='pb'>{_chart_timeline(d, pal)}</div></section>")
+    else:  # set vacío o sin ninguna fecha válida
+        timeline = ("<section class='panel'><div class='ph'>Aparición de narrativas y actividad coordinada</div>"
+                    "<div class='pb'><p class='vacio'>Sin fechas válidas para armar la línea de tiempo.</p></div></section>")
     narrativas = (f"<section class='panel'><div class='ph'>Ranking de narrativas · volumen y postura"
                   f"<span>pasá el mouse sobre una fila para ver la frase representativa</span></div>"
                   f"<div class='pb'>{_chart_rank(d, c, pal)}</div></section>")
